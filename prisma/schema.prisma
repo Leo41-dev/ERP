@@ -92,6 +92,7 @@ enum SatisDurum {
   KAYITLI
   FATURALANDI
   IPTAL
+  IADE // tüm kalemler iade edildi
 }
 
 enum TeklifDurum {
@@ -248,17 +249,21 @@ model Cari {
 }
 
 model CariHareket {
-  id         Int       @id @default(autoincrement())
-  cariId     Int
-  cari       Cari      @relation(fields: [cariId], references: [id])
-  tarih      DateTime
-  borc       Decimal   @default(0) @db.Decimal(14, 2)
-  alacak     Decimal   @default(0) @db.Decimal(14, 2)
-  aciklama   String?
-  satisId    Int?
-  satis      Satis?    @relation(fields: [satisId], references: [id])
-  tahsilatId Int?      @unique
-  tahsilat   Tahsilat? @relation(fields: [tahsilatId], references: [id])
+  id          Int        @id @default(autoincrement())
+  cariId      Int
+  cari        Cari       @relation(fields: [cariId], references: [id])
+  tarih       DateTime
+  borc        Decimal    @default(0) @db.Decimal(14, 2)
+  alacak      Decimal    @default(0) @db.Decimal(14, 2)
+  aciklama    String?
+  satisId     Int?
+  satis       Satis?     @relation(fields: [satisId], references: [id])
+  tahsilatId  Int?       @unique
+  tahsilat    Tahsilat?  @relation(fields: [tahsilatId], references: [id])
+  iadeId      Int?
+  iade        Iade?      @relation(fields: [iadeId], references: [id])
+  geriOdemeId Int?       @unique
+  geriOdeme   GeriOdeme? @relation(fields: [geriOdemeId], references: [id])
 
   @@index([cariId, tarih])
 }
@@ -401,6 +406,7 @@ model Satis {
   cariHareketleri CariHareket[]
   teslimKontrol   TeslimKontrol?
   teklif          Teklif?
+  iadeler         Iade[]
 
   @@index([tarih])
   @@index([durum])
@@ -408,20 +414,62 @@ model Satis {
 }
 
 model SatisKalemi {
-  id           Int     @id @default(autoincrement())
+  id           Int          @id @default(autoincrement())
   satisId      Int
-  satis        Satis   @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  satis        Satis        @relation(fields: [satisId], references: [id], onDelete: Cascade)
   urunId       Int?
-  urun         Urun?   @relation(fields: [urunId], references: [id])
+  urun         Urun?        @relation(fields: [urunId], references: [id])
   aracId       Int?
-  arac         Arac?   @relation(fields: [aracId], references: [id])
+  arac         Arac?        @relation(fields: [aracId], references: [id])
   aciklama     String
-  miktar       Decimal @default(1) @db.Decimal(14, 3)
-  birimFiyat   Decimal @db.Decimal(14, 2) // vergiler hariç
-  iskontoOrani Decimal @default(0) @db.Decimal(6, 4)
-  otvOrani     Decimal @default(0) @db.Decimal(6, 4)
-  kdvOrani     Decimal @default(0.2) @db.Decimal(6, 4)
-  tutar        Decimal @db.Decimal(14, 2) // vergiler dahil satır toplamı
+  miktar       Decimal      @default(1) @db.Decimal(14, 3)
+  birimFiyat   Decimal      @db.Decimal(14, 2) // vergiler hariç
+  iskontoOrani Decimal      @default(0) @db.Decimal(6, 4)
+  otvOrani     Decimal      @default(0) @db.Decimal(6, 4)
+  kdvOrani     Decimal      @default(0.2) @db.Decimal(6, 4)
+  tutar        Decimal      @db.Decimal(14, 2) // vergiler dahil satır toplamı
+  iadeler      IadeKalemi[]
+}
+
+// Satıştan iade. Kayıtlar silinmez: cariye alacak, müşteriye yapılan geri ödeme için borç yazılır.
+model Iade {
+  id             Int           @id @default(autoincrement())
+  iadeNo         Int           @unique @default(autoincrement())
+  satisId        Int
+  satis          Satis         @relation(fields: [satisId], references: [id])
+  tarih          DateTime      @default(now())
+  tutar          Decimal       @db.Decimal(14, 2) // vergiler dahil
+  otvToplam      Decimal       @db.Decimal(14, 2)
+  kdvToplam      Decimal       @db.Decimal(14, 2)
+  neden          String
+  faturaNo       String? // iade faturası
+  kaydeden       String
+  kalemler       IadeKalemi[]
+  geriOdemeler   GeriOdeme[]
+  cariHareketler CariHareket[]
+
+  @@index([tarih])
+}
+
+model IadeKalemi {
+  id            Int         @id @default(autoincrement())
+  iadeId        Int
+  iade          Iade        @relation(fields: [iadeId], references: [id], onDelete: Cascade)
+  satisKalemiId Int
+  satisKalemi   SatisKalemi @relation(fields: [satisKalemiId], references: [id])
+  miktar        Decimal     @db.Decimal(14, 3)
+  tutar         Decimal     @db.Decimal(14, 2)
+}
+
+/// İade nedeniyle müşteriye ödenen para
+model GeriOdeme {
+  id          Int          @id @default(autoincrement())
+  iadeId      Int
+  iade        Iade         @relation(fields: [iadeId], references: [id], onDelete: Cascade)
+  yontem      OdemeYontem
+  tutar       Decimal      @db.Decimal(14, 2)
+  aciklama    String?
+  cariHareket CariHareket?
 }
 
 model Tahsilat {

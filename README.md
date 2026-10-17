@@ -40,4 +40,5 @@ npm run dev
 - **Hızlı satış:** araç dışı satışlar (parça, aksesuar, ekipman, hizmet) için tek ekranda kalem, kartla/bölünmüş ödeme ve 80 mm ya da A5 satış fişi. Müşteri isteğe bağlı; boşsa perakende müşteri.
 - **Tahsilat ve cari:** satıştan veya müşteriden tahsilat (kapora dahil), senet/çek vade portföyü, yazıyla tutarlı makbuz, ters kayıtla tahsilat iptali, yürüyen bakiyeli cari ekstre ve yazdırma.
 - **Teklif:** araç modeli ve aksesuar/hizmet kalemleriyle teklif, satır bazında ÖTV/KDV, A4 çıktı ve WhatsApp mesajı; düzenleme, kopyalama, ret nedeni. Kabul edilen teklif tek tıkla araç satışına ya da hızlı satışa döner. Teklif müşteri kaydı açmaz; kayıtlı müşteriyse kartında görünür.
+- **İade:** faturalı araç satışından ya da hızlı satıştan tam veya kısmi iade; kesinti için tutar düşürülebilir. Araç stoğa (istenirse 2. el olarak) döner, iade cariye alacak, müşteriye yapılan geri ödeme borç yazılır; tamamı iade edilen satış "İade edildi" olur. A5 iade belgesi.
 - **Ayarlar:** kullanıcılar, firma bilgileri, konumlar, ÖTV oranları, PDI maddeleri, araç tipleri, marka ve modeller. Tanımlar silinmez, pasif yapılır.

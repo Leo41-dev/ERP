@@ -30,21 +30,27 @@ export async function cariEkstre(cariId: number, basla?: Date, bitis?: Date) {
   return { acilis, satirlar, kapanis: para(bakiye) };
 }
 
-/** İptal edilmemiş satışların tahsil edilmemiş kısmı */
+/** İptal edilmemiş satışların tahsil edilmemiş kısmı (iadeler düşülür, müşteriye geri ödenen eklenir) */
 export async function acikSatislar(filtre: { cariId?: number; saticiId?: number } = {}) {
-  const rows = await db.$queryRaw<{ id: number; formNo: number; cariId: number; unvan: string; tarih: Date; genelToplam: Prisma.Decimal; tahsil: Prisma.Decimal | null }[]>`
-    SELECT s.id, s."formNo", s."cariId", c.unvan, s.tarih, s."genelToplam",
-           COALESCE(SUM(t.tutar) FILTER (WHERE t."iptalZamani" IS NULL), 0) AS tahsil
-    FROM "Satis" s
-    JOIN "Cari" c ON c.id = s."cariId"
-    LEFT JOIN "Tahsilat" t ON t."satisId" = s.id
-    WHERE s.durum IN ('KAYITLI', 'FATURALANDI')
-      ${filtre.cariId ? Prisma.sql`AND s."cariId" = ${filtre.cariId}` : Prisma.empty}
-      ${filtre.saticiId ? Prisma.sql`AND s."saticiId" = ${filtre.saticiId}` : Prisma.empty}
-    GROUP BY s.id, c.unvan
-    HAVING s."genelToplam" - COALESCE(SUM(t.tutar) FILTER (WHERE t."iptalZamani" IS NULL), 0) >= 0.01
-    ORDER BY s.tarih ASC`;
-  return rows.map((r) => ({ ...r, genelToplam: Number(r.genelToplam), tahsil: Number(r.tahsil ?? 0), kalan: para(Number(r.genelToplam) - Number(r.tahsil ?? 0)) }));
+  const rows = await db.$queryRaw<{ id: number; formNo: number; cariId: number; unvan: string; tarih: Date; genelToplam: Prisma.Decimal; tahsil: Prisma.Decimal; iade: Prisma.Decimal; geri: Prisma.Decimal }[]>`
+    SELECT * FROM (
+      SELECT s.id, s."formNo", s."cariId", c.unvan, s.tarih, s."genelToplam",
+             (SELECT COALESCE(SUM(t.tutar), 0) FROM "Tahsilat" t WHERE t."satisId" = s.id AND t."iptalZamani" IS NULL) AS tahsil,
+             (SELECT COALESCE(SUM(i.tutar), 0) FROM "Iade" i WHERE i."satisId" = s.id) AS iade,
+             (SELECT COALESCE(SUM(g.tutar), 0) FROM "GeriOdeme" g JOIN "Iade" i ON i.id = g."iadeId" WHERE i."satisId" = s.id) AS geri
+      FROM "Satis" s
+      JOIN "Cari" c ON c.id = s."cariId"
+      WHERE s.durum IN ('KAYITLI', 'FATURALANDI')
+        ${filtre.cariId ? Prisma.sql`AND s."cariId" = ${filtre.cariId}` : Prisma.empty}
+        ${filtre.saticiId ? Prisma.sql`AND s."saticiId" = ${filtre.saticiId}` : Prisma.empty}
+    ) x
+    WHERE x."genelToplam" - x.iade - x.tahsil + x.geri >= 0.01
+    ORDER BY x.tarih ASC`;
+  return rows.map((r) => {
+    const genelToplam = Number(r.genelToplam);
+    const tahsil = Number(r.tahsil) - Number(r.geri);
+    return { ...r, genelToplam, iade: Number(r.iade), tahsil, kalan: para(genelToplam - Number(r.iade) - tahsil) };
+  });
 }
 
 /** Bakiyesi borçlu müşteriler (tedarikçi hesapları hariç) */

@@ -5,16 +5,18 @@ import { ODEME_AD, SATIS_DURUM_AD, SATIS_DURUM_RENK, tarih, tarihSaat, telefonGo
 import { belgeAyarlari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
+import { satisKalani } from "@/lib/satis/iade";
 import { faturaIsle, satisIptal, teslimKontrolKaydet } from "../eylem";
 import { FaturaFormu, IptalFormu, TeslimKontrolFormu } from "./Islemler";
 
-export default async function SatisDetay({ params }: { params: Promise<{ id: string }> }) {
+export default async function SatisDetay({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ iade?: string }> }) {
   const k = await yetkiIste();
   const id = Number((await params).id);
+  const yeniIade = Number((await searchParams).iade) || null;
   const s = Number.isInteger(id)
     ? await db.satis.findUnique({
         where: { id },
-        include: { cari: true, satici: true, kalemler: { include: { arac: { include: { maliyetler: true } } } }, tahsilatlar: { orderBy: { tarih: "asc" } }, teslimKontrol: true, teklif: { select: { id: true, teklifNo: true } } },
+        include: { cari: true, satici: true, kalemler: { include: { arac: { include: { maliyetler: true } } } }, tahsilatlar: { orderBy: { tarih: "asc" } }, teslimKontrol: true, teklif: { select: { id: true, teklifNo: true } }, iadeler: { orderBy: { tarih: "asc" }, include: { geriOdemeler: true, kalemler: { include: { satisKalemi: true } } } } },
       })
     : null;
   if (!s || (k.rol === "SATIS" && s.saticiId !== k.id)) notFound();
@@ -24,7 +26,11 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
   ]);
   const yapilan = (s.teslimKontrol?.maddeler ?? []) as { ad: string; tamam: boolean }[];
   const tahsil = s.tahsilatlar.filter((x) => !x.iptalZamani).reduce((t, x) => t + Number(x.tutar), 0);
-  const kalan = Math.round((Number(s.genelToplam) - tahsil) * 100) / 100;
+  const iadeToplam = s.iadeler.reduce((t, x) => t + Number(x.tutar), 0);
+  const geriOdeme = s.iadeler.reduce((t, x) => t + x.geriOdemeler.reduce((a, g) => a + Number(g.tutar), 0), 0);
+  const kalan = satisKalani({ genelToplam: Number(s.genelToplam), iade: iadeToplam, tahsil, geriOdeme });
+  const iadeAlinir = k.rol !== "DEPO" && k.rol !== "SERVIS" && (s.durum === "FATURALANDI" || (s.durum === "KAYITLI" && s.tur === "HIZLI"));
+  const sonIade = s.iadeler.find((x) => x.id === yeniIade);
   const maliyet = s.kalemler.reduce((t, x) => t + (x.arac?.maliyetler.reduce((a, m) => a + Number(m.tutar), 0) ?? 0), 0);
   const kayitli = s.durum === "KAYITLI";
   return (
@@ -41,6 +47,14 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
           </div>
         }
       />
+      {sonIade && (
+        <Kart className="mb-4 border-green-300 bg-green-50">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-green-800">İade {sonIade.iadeNo} kaydedildi · {tl(sonIade.tutar)}</p>
+            <BaglantiButon href={`/yazdir/iade/${sonIade.id}`} target="_blank">İade belgesini yazdır</BaglantiButon>
+          </div>
+        </Kart>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <Kart baslik="Müşteri">
           <p className="text-sm font-medium"><Link href={`/musteriler/${s.cari.id}`} className="hover:underline">{s.cari.unvan}</Link></p>
@@ -53,7 +67,8 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
             <dt className="text-zinc-500">ÖTV</dt><dd>{tl(s.otvToplam)}</dd>
             <dt className="text-zinc-500">KDV</dt><dd>{tl(s.kdvToplam)}</dd>
             <dt className="font-medium">Toplam (fatura)</dt><dd className="font-medium">{tl(s.genelToplam)}</dd>
-            {maliyetGorur(k) && s.durum !== "IPTAL" && (<><dt className="text-zinc-500">Kâr</dt><dd>{tl(Number(s.genelToplam) - maliyet)}</dd></>)}
+            {iadeToplam > 0 && (<><dt className="text-zinc-500">İade</dt><dd>−{tl(iadeToplam)}</dd></>)}
+            {maliyetGorur(k) && s.durum !== "IPTAL" && !iadeToplam && (<><dt className="text-zinc-500">Kâr</dt><dd>{tl(Number(s.genelToplam) - maliyet)}</dd></>)}
           </dl>
           {s.faturaNo && <p className="mt-2 text-xs text-zinc-500">Fatura {s.faturaNo} · {tarih(s.faturaTarihi)}</p>}
         </Kart>
@@ -80,10 +95,14 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
 
       <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">
-          Ödemeler · {tl(tahsil)} / {tl(s.genelToplam)}
+          Ödemeler · {tl(tahsil - geriOdeme)} / {tl(Number(s.genelToplam) - iadeToplam)}
           {s.durum !== "IPTAL" && kalan >= 0.01 && <span className="ml-2 text-amber-700">kalan {tl(kalan)}</span>}
+          {s.durum !== "IPTAL" && kalan <= -0.01 && <span className="ml-2 text-red-700">müşteriye borç {tl(-kalan)}</span>}
         </h2>
-        {s.durum !== "IPTAL" && k.rol !== "DEPO" && <Link href={`/tahsilat/yeni?satis=${s.id}`} className="text-sm text-zinc-600 hover:underline">Tahsilat ekle</Link>}
+        <div className="flex gap-4">
+          {iadeAlinir && <Link href={`/satislar/${s.id}/iade`} className="text-sm text-zinc-600 hover:underline">İade al</Link>}
+          {(s.durum === "KAYITLI" || s.durum === "FATURALANDI") && k.rol !== "DEPO" && <Link href={`/tahsilat/yeni?satis=${s.id}`} className="text-sm text-zinc-600 hover:underline">Tahsilat ekle</Link>}
+        </div>
       </div>
       <Tablo basliklar={["Tarih", "Yöntem", "Tutar", "Taksit / vade", "Açıklama", "Kaydeden", ""]} bos={!s.tahsilatlar.length}>
         {s.tahsilatlar.map((t) => (
@@ -94,6 +113,26 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
           </tr>
         ))}
       </Tablo>
+
+      {s.iadeler.length > 0 && (
+        <>
+          <h2 className="mb-2 mt-6 text-sm font-semibold">İadeler · {tl(iadeToplam)}</h2>
+          <Tablo basliklar={["No", "Tarih", "Kalemler", "Neden", "Tutar", "Geri ödeme", "Kaydeden", ""]}>
+            {s.iadeler.map((x) => (
+              <tr key={x.id}>
+                <Hucre>{x.iadeNo}</Hucre>
+                <Hucre>{tarih(x.tarih)}</Hucre>
+                <Hucre className="max-w-64 truncate">{x.kalemler.map((y) => `${y.satisKalemi.aciklama}${Number(y.miktar) !== 1 ? ` x${Number(y.miktar).toLocaleString("tr-TR")}` : ""}`).join(", ")}</Hucre>
+                <Hucre className="max-w-48 truncate">{x.neden}</Hucre>
+                <Hucre>{tl(x.tutar)}</Hucre>
+                <Hucre>{x.geriOdemeler.length ? x.geriOdemeler.map((g) => `${ODEME_AD[g.yontem]} ${tl(g.tutar)}`).join(", ") : "-"}</Hucre>
+                <Hucre>{x.kaydeden}</Hucre>
+                <Hucre><Link href={`/yazdir/iade/${x.id}`} target="_blank" className="text-xs text-zinc-600 hover:underline">Belge</Link></Hucre>
+              </tr>
+            ))}
+          </Tablo>
+        </>
+      )}
 
       {(s.aksesuarlar || s.hizmetler || s.not || s.teslimTarihi) && (
         <Kart baslik="Teslim ve notlar" className="mt-6">
@@ -119,7 +158,7 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
       {kayitli && (
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {(k.rol === "YONETICI" || k.rol === "MUHASEBE") && <Kart baslik="Fatura"><FaturaFormu eylem={faturaIsle.bind(null, s.id)} /></Kart>}
-          {(k.rol === "YONETICI" || k.rol === "SATIS") && <Kart baslik="İptal"><IptalFormu eylem={satisIptal.bind(null, s.id)} /></Kart>}
+          {(k.rol === "YONETICI" || k.rol === "SATIS") && !s.iadeler.length && <Kart baslik="İptal"><IptalFormu eylem={satisIptal.bind(null, s.id)} /></Kart>}
         </div>
       )}
       {s.durum === "IPTAL" && (

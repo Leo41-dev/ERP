@@ -29,10 +29,10 @@ export function telefonGoster(t: string | null | undefined): string {
 export const ROL_AD: Record<string, string> = { YONETICI: "Yönetici", SATIS: "Satış", DEPO: "Depo", SERVIS: "Servis", MUHASEBE: "Muhasebe" };
 export const KONDISYON_AD: Record<string, string> = { SIFIR: "Sıfır", IKINCI_EL: "2. el", KONSINYE: "Konsinye" };
 export const ARAC_DURUM_AD: Record<string, string> = { STOKTA: "Stokta", REZERVE: "Rezerve", SATILDI: "Satıldı", IADE: "İade" };
-export const SATIS_DURUM_AD: Record<string, string> = { TASLAK: "Taslak", KAYITLI: "Kayıtlı", FATURALANDI: "Faturalandı", IPTAL: "İptal" };
+export const SATIS_DURUM_AD: Record<string, string> = { TASLAK: "Taslak", KAYITLI: "Kayıtlı", FATURALANDI: "Faturalandı", IPTAL: "İptal", IADE: "İade edildi" };
 export const ODEME_AD: Record<string, string> = { HAVALE: "Havale/EFT", KART: "Kredi kartı", NAKIT: "Nakit", SENET: "Senet", CEK: "Çek", DIGER: "Diğer" };
 export const TESCIL_AD: Record<string, string> = { TESCILSIZ: "Tescilsiz", BASVURUDA: "Başvuruda", TESCILLI: "Tescilli" };
-export const SATIS_DURUM_RENK = { TASLAK: "gri", KAYITLI: "sari", FATURALANDI: "yesil", IPTAL: "kirmizi" } as const;
+export const SATIS_DURUM_RENK = { TASLAK: "gri", KAYITLI: "sari", FATURALANDI: "yesil", IPTAL: "kirmizi", IADE: "gri" } as const;
 
 /** Teklif durumu; açık teklifin geçerlilik tarihi geçmişse "süresi doldu" gösterilir. */
 export function teklifDurum(t: { durum: string; gecerlilik: Date }) {

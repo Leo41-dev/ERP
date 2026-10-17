@@ -133,6 +133,7 @@ export async function satisIptal(id: number, _: SatisDurum, form: FormData): Pro
   if (!neden) return { genel: "İptal nedeni yazılmalı." };
   const s = await satisGetir(k, id);
   if (s.durum !== "KAYITLI") return { genel: "Yalnızca kayıtlı (faturası kesilmemiş) satış iptal edilebilir. Faturalı satış için iade yapılır." };
+  if (await db.iade.count({ where: { satisId: id } })) return { genel: "İade alınmış satış iptal edilemez." };
   await db.$transaction(async (tx) => {
     await tx.satis.update({ where: { id }, data: { durum: "IPTAL", iptalNedeni: neden, iptalEden: k.adSoyad, iptalZamani: new Date() } });
     const aracIdler = s.kalemler.map((x) => x.aracId).filter((x): x is number => x !== null);
