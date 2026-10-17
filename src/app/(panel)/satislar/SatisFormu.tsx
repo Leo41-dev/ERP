@@ -124,7 +124,7 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
                 {Object.entries(ODEME_AD).map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
               </Secim>
               <Girdi name="odeme_tutar" inputMode="decimal" placeholder="Tutar" value={o.tutar} onChange={(e) => odemeGuncelle(o.anahtar, "tutar", e.target.value)} />
-              <Girdi name="odeme_taksit" inputMode="numeric" placeholder="Taksit" disabled={o.yontem !== "KART"} value={o.taksit} onChange={(e) => odemeGuncelle(o.anahtar, "taksit", e.target.value)} />
+              <Girdi name="odeme_taksit" inputMode="numeric" placeholder="Taksit" readOnly={o.yontem !== "KART"} value={o.yontem === "KART" ? o.taksit : ""} onChange={(e) => odemeGuncelle(o.anahtar, "taksit", e.target.value)} />
               <Girdi name="odeme_aciklama" placeholder="Açıklama (banka, senet no...)" value={o.aciklama} onChange={(e) => odemeGuncelle(o.anahtar, "aciklama", e.target.value)} />
               <Buton type="button" tur="ikincil" onClick={() => setOdemeler((l) => l.filter((x) => x.anahtar !== o.anahtar))} disabled={odemeler.length === 1}>Sil</Buton>
             </div>

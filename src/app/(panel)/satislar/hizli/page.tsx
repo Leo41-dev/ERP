@@ -1,0 +1,57 @@
+import Link from "next/link";
+import { BaglantiButon, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
+import { ODEME_AD, tarihSaat, tl } from "@/lib/bicim";
+import { db } from "@/lib/db";
+import { yetkiIste } from "@/lib/oturum";
+import { HizliSatisFormu } from "./HizliSatisFormu";
+
+export default async function HizliSatis({ searchParams }: { searchParams: Promise<{ kayit?: string }> }) {
+  const k = await yetkiIste("SATIS", "MUHASEBE", "SERVIS");
+  const kayitId = Number((await searchParams).kayit) || null;
+  // Türkiye saatiyle bugünün başı (UTC+3, yaz saati yok)
+  const gunBasi = new Date(Math.floor((Date.now() + 3 * 3_600_000) / 86_400_000) * 86_400_000 - 3 * 3_600_000);
+  const [firmalar, oncekiler, kayit, bugun] = await Promise.all([
+    db.firma.findMany({ where: { aktif: true }, orderBy: { id: "asc" }, select: { id: true, unvan: true, varsayilan: true } }),
+    // sık yazılan ürün/hizmet adları öneri olarak gelir
+    db.satisKalemi.findMany({ where: { satis: { tur: "HIZLI" } }, distinct: ["aciklama"], orderBy: { id: "desc" }, take: 300, select: { aciklama: true } }),
+    kayitId ? db.satis.findFirst({ where: { id: kayitId, tur: "HIZLI", ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) } }) : null,
+    db.satis.findMany({
+      where: { tur: "HIZLI", tarih: { gte: gunBasi }, ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) },
+      orderBy: { tarih: "desc" },
+      include: { kalemler: { select: { aciklama: true } }, tahsilatlar: { select: { yontem: true } } },
+    }),
+  ]);
+  const gunToplam = bugun.filter((s) => s.durum !== "IPTAL").reduce((t, s) => t + Number(s.genelToplam), 0);
+
+  return (
+    <>
+      <SayfaBaslik baslik="Hızlı satış" aciklama="Araç dışı satışlar: parça, aksesuar, ekipman, hizmet. Kaydettikten sonra fişi yazdırın." />
+      {kayit && (
+        <Kart className="mb-4 border-green-300 bg-green-50">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-green-800">Satış {kayit.formNo} kaydedildi · {tl(kayit.genelToplam)}</p>
+            <div className="flex gap-2">
+              <BaglantiButon href={`/yazdir/fis/${kayit.id}`} target="_blank">Fişi yazdır</BaglantiButon>
+              <Link href={`/satislar/${kayit.id}`} className="rounded-md border border-zinc-300 bg-white px-3.5 py-2 text-sm">Satışı aç</Link>
+            </div>
+          </div>
+        </Kart>
+      )}
+      <HizliSatisFormu key={kayitId ?? "yeni"} firmalar={firmalar} oneriler={oncekiler.map((x) => x.aciklama)} />
+
+      <h2 className="mb-2 mt-8 text-sm font-semibold">Bugünkü hızlı satışlar · {tl(gunToplam)}</h2>
+      <Tablo basliklar={["No", "Saat", "Kalemler", "Ödeme", "Tutar", ""]} bos={!bugun.length}>
+        {bugun.map((s) => (
+          <tr key={s.id} className={s.durum === "IPTAL" ? "text-zinc-400 line-through" : ""}>
+            <Hucre><Link href={`/satislar/${s.id}`} className="hover:underline">{s.formNo}</Link></Hucre>
+            <Hucre>{tarihSaat(s.tarih).split(" ").pop()}</Hucre>
+            <Hucre className="max-w-80 truncate">{s.kalemler.map((x) => x.aciklama).join(", ")}</Hucre>
+            <Hucre>{[...new Set(s.tahsilatlar.map((t) => ODEME_AD[t.yontem]))].join(", ")}</Hucre>
+            <Hucre>{tl(s.genelToplam)}</Hucre>
+            <Hucre><Link href={`/yazdir/fis/${s.id}`} target="_blank" className="text-xs text-zinc-600 hover:underline">Fiş</Link></Hucre>
+          </tr>
+        ))}
+      </Tablo>
+    </>
+  );
+}

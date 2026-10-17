@@ -18,3 +18,16 @@ export function odemeFarki(genelToplam: number, odemeler: OdemeSatiri[]) {
   const toplam = para(odemeler.reduce((t, o) => t + o.tutar, 0));
   return { toplam, fark: para(genelToplam - toplam) };
 }
+
+export type KalemGirdisi = { aciklama: string; miktar: number; birimFiyat: number; kdvOrani: number }; // birim fiyat KDV dahil
+
+/** Hızlı satış kalemleri: KDV dahil birim fiyattan satır tutarı, KDV hariç birim fiyat ve KDV */
+export function kalemHesapla(kalemler: KalemGirdisi[]) {
+  const satirlar = kalemler.map((k) => {
+    const tutar = para(k.miktar * k.birimFiyat);
+    const matrah = para(tutar / (1 + k.kdvOrani));
+    return { ...k, tutar, matrah, kdv: para(tutar - matrah), birimMatrah: para(k.birimFiyat / (1 + k.kdvOrani)) };
+  });
+  const toplam = (a: "tutar" | "matrah" | "kdv") => para(satirlar.reduce((t, s) => t + s[a], 0));
+  return { satirlar, genelToplam: toplam("tutar"), matrah: toplam("matrah"), kdv: toplam("kdv") };
+}

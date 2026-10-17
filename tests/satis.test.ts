@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { odemeFarki, vergiKirilimi } from "../src/lib/satis/hesap";
+import { hizliSatisDogrula } from "../src/lib/dogrulama/hizliSatis";
+import { kalemHesapla, odemeFarki, vergiKirilimi } from "../src/lib/satis/hesap";
 
 describe("vergiKirilimi", () => {
   it("KDV dahil tutardan ÖTV ve KDV'yi ayırır", () => {
@@ -25,5 +26,43 @@ describe("odemeFarki", () => {
       { yontem: "KART", tutar: 350_000, taksit: 6, aciklama: null },
     ]);
     expect(o).toEqual({ toplam: 950_000, fark: 50_000 });
+  });
+});
+
+describe("kalemHesapla", () => {
+  it("KDV dahil fiyatlardan satır ve genel toplamları çıkarır", () => {
+    const h = kalemHesapla([
+      { aciklama: "KASK", miktar: 2, birimFiyat: 1200, kdvOrani: 0.2 },
+      { aciklama: "KİTAP", miktar: 1, birimFiyat: 110, kdvOrani: 0.1 },
+    ]);
+    expect(h.genelToplam).toBe(2510);
+    expect(h.satirlar[0]).toMatchObject({ tutar: 2400, matrah: 2000, kdv: 400, birimMatrah: 1000 });
+    expect(h.matrah + h.kdv).toBe(2510);
+  });
+});
+
+describe("hizliSatisDogrula", () => {
+  const form = (alanlar: [string, string][]) => {
+    const f = new FormData();
+    for (const [a, d] of alanlar) f.append(a, d);
+    return f;
+  };
+  it("boş satırları atlar, taksiti yalnızca kartta alır", () => {
+    const { veri, hatalar } = hizliSatisDogrula(
+      form([
+        ["kalem_aciklama", "kask"], ["kalem_miktar", "1"], ["kalem_fiyat", "1.500,50"], ["kalem_kdv", "0.2"],
+        ["kalem_aciklama", ""], ["kalem_miktar", "1"], ["kalem_fiyat", ""], ["kalem_kdv", "0.2"],
+        ["odeme_yontem", "NAKIT"], ["odeme_tutar", "500"], ["odeme_taksit", ""], ["odeme_aciklama", ""],
+        ["odeme_yontem", "KART"], ["odeme_tutar", "1000,50"], ["odeme_taksit", "3"], ["odeme_aciklama", ""],
+      ]),
+    );
+    expect(hatalar).toEqual({});
+    expect(veri.kalemler).toEqual([{ aciklama: "KASK", miktar: 1, birimFiyat: 1500.5, kdvOrani: 0.2 }]);
+    expect(veri.odemeler.map((o) => [o.yontem, o.tutar, o.taksit])).toEqual([["NAKIT", 500, null], ["KART", 1000.5, 3]]);
+  });
+  it("kalem yoksa ve telefon girilip ad yoksa hata verir", () => {
+    const { hatalar } = hizliSatisDogrula(form([["telefon", "0532 111 22 33"], ["odeme_yontem", "KART"], ["odeme_tutar", "10"], ["odeme_taksit", ""], ["odeme_aciklama", ""]]));
+    expect(hatalar.kalemler).toBeTruthy();
+    expect(hatalar.unvan).toBeTruthy();
   });
 });

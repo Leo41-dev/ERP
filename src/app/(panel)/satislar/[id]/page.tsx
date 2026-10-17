@@ -29,12 +29,14 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
   return (
     <>
       <SayfaBaslik
-        baslik={`Satış ${s.formNo}`}
+        baslik={`${s.tur === "HIZLI" ? "Hızlı satış" : "Satış"} ${s.formNo}`}
         aciklama={`${tarihSaat(s.tarih)} · ${s.satici?.adSoyad ?? "-"}`}
         sag={
           <div className="flex items-center gap-2">
             <Etiket renk={SATIS_DURUM_RENK[s.durum]}>{SATIS_DURUM_AD[s.durum]}</Etiket>
-            <BaglantiButon href={`/yazdir/satis/${s.id}`} target="_blank">Satış formu ve PDI yazdır</BaglantiButon>
+            {s.tur === "HIZLI"
+              ? <BaglantiButon href={`/yazdir/fis/${s.id}`} target="_blank">Fişi yazdır</BaglantiButon>
+              : <BaglantiButon href={`/yazdir/satis/${s.id}`} target="_blank">Satış formu ve PDI yazdır</BaglantiButon>}
           </div>
         }
       />
@@ -57,12 +59,18 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
       </div>
 
       <h2 className="mb-2 mt-6 text-sm font-semibold">Kalemler</h2>
-      <Tablo basliklar={["Açıklama", "Şase", "ÖTV", "KDV", "Tutar"]}>
+      <Tablo basliklar={s.tur === "HIZLI" ? ["Açıklama", "Adet", "KDV", "Tutar"] : ["Açıklama", "Şase", "ÖTV", "KDV", "Tutar"]}>
         {s.kalemler.map((x) => (
           <tr key={x.id}>
             <Hucre>{x.aciklama}</Hucre>
-            <Hucre>{x.arac ? <Link href={`/araclar/${x.arac.id}`} className="font-mono hover:underline">{x.arac.sase}</Link> : "-"}</Hucre>
-            <Hucre>{yuzde(x.otvOrani)}</Hucre>
+            {s.tur === "HIZLI" ? (
+              <Hucre>{Number(x.miktar).toLocaleString("tr-TR")}</Hucre>
+            ) : (
+              <>
+                <Hucre>{x.arac ? <Link href={`/araclar/${x.arac.id}`} className="font-mono hover:underline">{x.arac.sase}</Link> : "-"}</Hucre>
+                <Hucre>{yuzde(x.otvOrani)}</Hucre>
+              </>
+            )}
             <Hucre>{yuzde(x.kdvOrani)}</Hucre>
             <Hucre>{tl(x.tutar)}</Hucre>
           </tr>
@@ -90,7 +98,7 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
         </Kart>
       )}
 
-      {s.durum !== "IPTAL" && (
+      {s.durum !== "IPTAL" && s.tur === "ARAC" && (
         <Kart baslik="Araç teslim ve son kontrol listesi (PDI)" className="mt-6" sag={s.teslimKontrol && <span className="text-xs text-zinc-500">{tarihSaat(s.teslimKontrol.tarih)}</span>}>
           <TeslimKontrolFormu
             eylem={teslimKontrolKaydet.bind(null, s.id)}

@@ -13,6 +13,8 @@ export const BELGE_AYARLARI = {
       "Yukarıda şase ve model bilgileri yazılı aracı; görsel, mekanik ve donanım olarak eksiksiz, hasarsız ve çalışır durumda, yedek anahtarı ve kitapçıklarıyla birlikte teslim aldım.",
     cokSatir: true,
   },
+  "belge.fisBaslik": { ad: "Hızlı satış fişi başlığı", varsayilan: "SATIŞ FİŞİ", cokSatir: false },
+  "belge.fisNotu": { ad: "Hızlı satış fişi alt metni", varsayilan: "Bu fiş bilgi amaçlıdır; faturanız ayrıca düzenlenir. Teşekkür ederiz.", cokSatir: true },
   "belge.kontrolEden": { ad: "Varsayılan kontrol eden", varsayilan: "", cokSatir: false },
 } as const;
 

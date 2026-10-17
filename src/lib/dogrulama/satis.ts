@@ -33,6 +33,25 @@ export function satisDogrula(f: FormData): { veri: SatisVeri; hatalar: Hatalar }
     if (Number.isNaN(teslimTarihi.getTime())) h.teslimTarihi = "Tarih geçersiz.";
   }
 
+  const odemeler = odemeSatirlari(f, h);
+  return {
+    veri: {
+      aracId,
+      genelToplam: Math.round(genelToplam * 100) / 100,
+      kdvOrani: kdvOrani ?? 0.2,
+      otvOrani: otvOrani ?? 0,
+      teslimTarihi,
+      aksesuarlar: s("aksesuarlar") || null,
+      hizmetler: s("hizmetler") || null,
+      not: s("not") || null,
+      odemeler,
+    },
+    hatalar: h,
+  };
+}
+
+/** Formdaki ödeme satırları (odeme_yontem, odeme_tutar, odeme_taksit, odeme_aciklama); boş satırlar atlanır. */
+export function odemeSatirlari(f: FormData, h: Hatalar): OdemeSatiri[] {
   const yontemler = f.getAll("odeme_yontem").map(String);
   const tutarlar = f.getAll("odeme_tutar").map(String);
   const taksitler = f.getAll("odeme_taksit").map(String);
@@ -51,18 +70,5 @@ export function satisDogrula(f: FormData): { veri: SatisVeri; hatalar: Hatalar }
     const taksit = Number(taksitler[i]);
     odemeler.push({ yontem, tutar, taksit: yontem === "KART" && taksit > 1 ? taksit : null, aciklama });
   });
-  return {
-    veri: {
-      aracId,
-      genelToplam: Math.round(genelToplam * 100) / 100,
-      kdvOrani: kdvOrani ?? 0.2,
-      otvOrani: otvOrani ?? 0,
-      teslimTarihi,
-      aksesuarlar: s("aksesuarlar") || null,
-      hizmetler: s("hizmetler") || null,
-      not: s("not") || null,
-      odemeler,
-    },
-    hatalar: h,
-  };
+  return odemeler;
 }

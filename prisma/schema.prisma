@@ -82,6 +82,11 @@ enum StokHareketTur {
   SAYIM
 }
 
+enum SatisTur {
+  ARAC // şaseli araç satışı (satış formu + PDI)
+  HIZLI // araç dışı tezgâh satışı: parça, aksesuar, ekipman, hizmet
+}
+
 enum SatisDurum {
   TASLAK
   KAYITLI
@@ -351,6 +356,7 @@ model KonumTransferi {
 model Satis {
   id              Int            @id @default(autoincrement())
   formNo          Int            @unique @default(autoincrement()) // iptal edilen numara yeniden kullanılmaz
+  tur             SatisTur       @default(ARAC)
   firmaId         Int?
   firma           Firma?         @relation(fields: [firmaId], references: [id])
   cariId          Int
@@ -387,6 +393,7 @@ model Satis {
 
   @@index([tarih])
   @@index([durum])
+  @@index([tur, tarih])
 }
 
 model SatisKalemi {
