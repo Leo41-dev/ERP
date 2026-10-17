@@ -2,6 +2,7 @@
 import { Prisma, type Rol } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { BELGE_AYARLARI, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { eposta as epostaNormalize, metin, sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
@@ -192,4 +193,35 @@ export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMad
   if (aktif === undefined) return;
   await denetim(k.kullaniciAdi, aktif ? "PASIF" : "AKTIF", tablo, id);
   revalidatePath("/ayarlar");
+}
+
+/* ---------- yazdırılan belgeler ---------- */
+
+export async function belgeAyarKaydet(_: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  for (const anahtar of Object.keys(BELGE_AYARLARI)) {
+    const deger = String(f.get(anahtar) ?? "").trim();
+    // varsayılanla aynı ya da boşsa kayıt tutulmaz; belge varsayılanı kullanır
+    if (!deger || deger === BELGE_AYARLARI[anahtar as BelgeAyarAnahtari].varsayilan) await db.ayar.deleteMany({ where: { anahtar } });
+    else await db.ayar.upsert({ where: { anahtar }, update: { deger }, create: { anahtar, deger } });
+  }
+  await denetim(k.kullaniciAdi, "GUNCELLE", "Ayar", "belge");
+  revalidatePath("/ayarlar");
+  return { tamam: "Kaydedildi." };
+}
+
+export async function maddeGuncelle(id: number, _: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const ad = yazi(f, "ad");
+  const sira = Number(f.get("sira"));
+  if (!ad) return { hata: "Madde boş olamaz." };
+  if (!Number.isInteger(sira) || sira < 1) return { hata: "Sıra 1 veya büyük bir tam sayı olmalı." };
+  try {
+    await db.kontrolMaddesi.update({ where: { id }, data: { ad, sira } });
+  } catch (e) {
+    return benzersiz(e, "Bu madde zaten var.");
+  }
+  await denetim(k.kullaniciAdi, "GUNCELLE", "KontrolMaddesi", id);
+  revalidatePath("/ayarlar");
+  return { tamam: "Kaydedildi." };
 }

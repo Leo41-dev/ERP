@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
 import { ODEME_AD, SATIS_DURUM_AD, SATIS_DURUM_RENK, tarih, tarihSaat, telefonGoster, tl, yuzde } from "@/lib/bicim";
+import { belgeAyarlari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
 import { faturaIsle, satisIptal, teslimKontrolKaydet } from "../eylem";
@@ -17,7 +18,10 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
       })
     : null;
   if (!s || (k.rol === "SATIS" && s.saticiId !== k.id)) notFound();
-  const maddeler = await db.kontrolMaddesi.findMany({ where: { aktif: true }, orderBy: { sira: "asc" } });
+  const [maddeler, belge] = await Promise.all([
+    db.kontrolMaddesi.findMany({ where: { aktif: true }, orderBy: { sira: "asc" } }),
+    belgeAyarlari(),
+  ]);
   const yapilan = (s.teslimKontrol?.maddeler ?? []) as { ad: string; tamam: boolean }[];
   const tahsil = s.tahsilatlar.reduce((t, x) => t + Number(x.tutar), 0);
   const maliyet = s.kalemler.reduce((t, x) => t + (x.arac?.maliyetler.reduce((a, m) => a + Number(m.tutar), 0) ?? 0), 0);
@@ -90,7 +94,7 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
         <Kart baslik="Araç teslim ve son kontrol listesi (PDI)" className="mt-6" sag={s.teslimKontrol && <span className="text-xs text-zinc-500">{tarihSaat(s.teslimKontrol.tarih)}</span>}>
           <TeslimKontrolFormu
             eylem={teslimKontrolKaydet.bind(null, s.id)}
-            kontrolEden={s.teslimKontrol?.kontrolEden ?? ""}
+            kontrolEden={s.teslimKontrol?.kontrolEden ?? belge["belge.kontrolEden"]}
             maddeler={maddeler.map((m) => ({ id: m.id, ad: m.ad, tamam: yapilan.some((y) => y.ad === m.ad && y.tamam) }))}
           />
         </Kart>

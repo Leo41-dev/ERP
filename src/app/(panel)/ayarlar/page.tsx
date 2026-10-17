@@ -3,7 +3,8 @@ import { Alan, Etiket, Girdi, Kart, MetinAlani, SayfaBaslik, Secim } from "@/com
 import { yuzde } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
-import { aktiflikDegistir, firmaKaydet, konumEkle, maddeEkle, markaEkle, modelEkle, otvEkle, tipEkle } from "./eylem";
+import { BELGE_AYARLARI, belgeAyarlari, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
+import { aktiflikDegistir, belgeAyarKaydet, firmaKaydet, konumEkle, maddeEkle, maddeGuncelle, markaEkle, modelEkle, otvEkle, tipEkle } from "./eylem";
 import { AktiflikButonu, AyarFormu } from "./Formlar";
 
 function Liste({ ogeler }: { ogeler: { id: number; ad: string; aktif?: boolean; sag?: React.ReactNode }[] }) {
@@ -31,6 +32,7 @@ export default async function Ayarlar() {
     db.marka.findMany({ orderBy: { ad: "asc" }, include: { modeller: { include: { tip: true }, orderBy: [{ model: "asc" }, { altModel: "asc" }] } } }),
     db.kullanici.count({ where: { aktif: true } }),
   ]);
+  const belge = await belgeAyarlari();
   const aktifOtv = otvler.filter((o) => o.aktif);
 
   return (
@@ -59,6 +61,21 @@ export default async function Ayarlar() {
           ))}
         </Kart>
 
+        <Kart baslik="Yazdırılan belgeler" sag={<span className="text-xs text-zinc-500">Boş bırakılan alan varsayılana döner</span>}>
+          <AyarFormu eylem={belgeAyarKaydet} buton="Kaydet" className="grid gap-2">
+            {(Object.keys(BELGE_AYARLARI) as BelgeAyarAnahtari[]).map((a) => {
+              const t = BELGE_AYARLARI[a];
+              return (
+                <Alan key={a} etiket={t.ad}>
+                  {t.cokSatir
+                    ? <MetinAlani name={a} rows={3} defaultValue={belge[a]} placeholder={t.varsayilan} />
+                    : <Girdi name={a} defaultValue={belge[a]} placeholder={t.varsayilan} />}
+                </Alan>
+              );
+            })}
+          </AyarFormu>
+        </Kart>
+
         <Kart baslik="Araç konumları">
           <Liste ogeler={konumlar.map((x) => ({ id: x.id, ad: x.ad, aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "konum", x.id)} /> }))} />
           <AyarFormu eylem={konumEkle}><Girdi name="ad" placeholder="Yeni konum" className="w-auto flex-1" required /></AyarFormu>
@@ -70,7 +87,19 @@ export default async function Ayarlar() {
         </Kart>
 
         <Kart baslik="Teslim kontrol listesi (PDI)">
-          <Liste ogeler={maddeler.map((x) => ({ id: x.id, ad: `${x.sira}. ${x.ad}`, aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kontrolMaddesi", x.id)} /> }))} />
+          <ul className="mb-3 space-y-1.5">
+            {maddeler.map((x) => (
+              <li key={x.id} className="flex items-start gap-2">
+                <div className="flex-1">
+                  <AyarFormu eylem={maddeGuncelle.bind(null, x.id)} buton="Kaydet">
+                    <Girdi name="sira" type="number" min={1} defaultValue={x.sira} className="w-16" aria-label="Sıra" />
+                    <Girdi name="ad" defaultValue={x.ad} className={`w-auto flex-1 ${x.aktif ? "" : "text-zinc-400 line-through"}`} aria-label="Madde" />
+                  </AyarFormu>
+                </div>
+                <div className="pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kontrolMaddesi", x.id)} /></div>
+              </li>
+            ))}
+          </ul>
           <AyarFormu eylem={maddeEkle}><Girdi name="ad" placeholder="Yeni madde" className="w-auto flex-1" required /></AyarFormu>
         </Kart>
 

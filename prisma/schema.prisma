@@ -464,3 +464,10 @@ model DenetimKaydi {
 
   @@index([tablo, kayitId])
 }
+
+/// Kullanım sırasında değiştirilebilen ayarlar (belge başlıkları, metinler). Anahtarlar src/lib/belgeAyarlari.ts içinde.
+model Ayar {
+  anahtar    String   @id
+  deger      String
+  guncelleme DateTime @updatedAt
+}
