@@ -120,9 +120,22 @@ model Kullanici {
   rol          Rol           @default(SATIS)
   aktif        Boolean       @default(true)
   sonGiris     DateTime?
+  hataliDeneme Int           @default(0)
+  kilitBitis   DateTime?
+  oturumlar    Oturum[]
   olusturma    DateTime      @default(now())
   satislar     Satis[]       @relation("Satici")
   hedefler     SatisHedefi[]
+}
+
+model Oturum {
+  id          String    @id // token'ın SHA-256 özeti; token yalnızca çerezde durur
+  kullaniciId Int
+  kullanici   Kullanici @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  bitis       DateTime
+  olusturma   DateTime  @default(now())
+
+  @@index([kullaniciId])
 }
 
 model Konum {
@@ -354,6 +367,8 @@ model Satis {
   // Satıcının elle belirlediği tutar. Fatura bu tutarla kesilir; ayrı bir fiyat alanı yoktur.
   genelToplam     Decimal        @db.Decimal(14, 2)
   teslimTarihi    DateTime?      @db.Date
+  aksesuarlar     String? // satışla birlikte verilen aksesuarlar (serbest metin)
+  hizmetler       String?
   not             String?
   faturaNo        String?
   faturaTarihi    DateTime?      @db.Date

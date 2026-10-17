@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "Rol" AS ENUM ('YONETICI', 'SATIS', 'DEPO', 'SERVIS', 'MUHASEBE');
 
@@ -57,9 +60,21 @@ CREATE TABLE "Kullanici" (
     "rol" "Rol" NOT NULL DEFAULT 'SATIS',
     "aktif" BOOLEAN NOT NULL DEFAULT true,
     "sonGiris" TIMESTAMP(3),
+    "hataliDeneme" INTEGER NOT NULL DEFAULT 0,
+    "kilitBitis" TIMESTAMP(3),
     "olusturma" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Kullanici_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Oturum" (
+    "id" TEXT NOT NULL,
+    "kullaniciId" INTEGER NOT NULL,
+    "bitis" TIMESTAMP(3) NOT NULL,
+    "olusturma" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Oturum_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -271,6 +286,8 @@ CREATE TABLE "Satis" (
     "kdvToplam" DECIMAL(14,2),
     "genelToplam" DECIMAL(14,2) NOT NULL,
     "teslimTarihi" DATE,
+    "aksesuarlar" TEXT,
+    "hizmetler" TEXT,
     "not" TEXT,
     "faturaNo" TEXT,
     "faturaTarihi" DATE,
@@ -375,6 +392,9 @@ CREATE UNIQUE INDEX "Kullanici_kullaniciAdi_key" ON "Kullanici"("kullaniciAdi");
 CREATE UNIQUE INDEX "Kullanici_eposta_key" ON "Kullanici"("eposta");
 
 -- CreateIndex
+CREATE INDEX "Oturum_kullaniciId_idx" ON "Oturum"("kullaniciId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Konum_ad_key" ON "Konum"("ad");
 
 -- CreateIndex
@@ -459,6 +479,9 @@ CREATE UNIQUE INDEX "SatisHedefi_kullaniciId_ay_key" ON "SatisHedefi"("kullanici
 CREATE INDEX "DenetimKaydi_tablo_kayitId_idx" ON "DenetimKaydi"("tablo", "kayitId");
 
 -- AddForeignKey
+ALTER TABLE "Oturum" ADD CONSTRAINT "Oturum_kullaniciId_fkey" FOREIGN KEY ("kullaniciId") REFERENCES "Kullanici"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "AracModeli" ADD CONSTRAINT "AracModeli_markaId_fkey" FOREIGN KEY ("markaId") REFERENCES "Marka"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -535,3 +558,4 @@ ALTER TABLE "TeslimKontrol" ADD CONSTRAINT "TeslimKontrol_satisId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "SatisHedefi" ADD CONSTRAINT "SatisHedefi_kullaniciId_fkey" FOREIGN KEY ("kullaniciId") REFERENCES "Kullanici"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
