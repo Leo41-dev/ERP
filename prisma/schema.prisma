@@ -1,0 +1,451 @@
+// Kartepe ATV ERP – veritabanı şeması
+// Tutarlar Decimal(14,2), oranlar kesir olarak Decimal(6,4) tutulur (0.25 = %25).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enum'lar
+
+enum Rol {
+  YONETICI
+  SATIS
+  DEPO
+  SERVIS
+  MUHASEBE
+}
+
+enum CariTip {
+  BIREYSEL
+  KURUMSAL
+}
+
+enum CariRol {
+  MUSTERI
+  TEDARIKCI
+  MUSTERI_TEDARIKCI
+}
+
+enum UrunTur {
+  ARAC
+  YEDEK_PARCA
+  AKSESUAR
+  HIZMET
+  DIGER
+}
+
+enum ParaBirimi {
+  TRY
+  EUR
+  USD
+}
+
+enum Kondisyon {
+  SIFIR
+  IKINCI_EL
+  KONSINYE
+}
+
+enum AracDurum {
+  STOKTA
+  REZERVE
+  SATILDI
+  IADE
+}
+
+enum TescilDurum {
+  TESCILSIZ
+  BASVURUDA
+  TESCILLI
+}
+
+enum MaliyetTur {
+  ALIS
+  OTV
+  KDV_FARKI
+  AKSESUAR
+  POS
+  NAKLIYE
+  DIGER
+}
+
+enum StokHareketTur {
+  ACILIS
+  ALIS
+  SATIS
+  IADE
+  SAYIM
+}
+
+enum SatisDurum {
+  TASLAK
+  KAYITLI
+  FATURALANDI
+  IPTAL
+}
+
+enum OdemeYontem {
+  HAVALE
+  KART
+  NAKIT
+  SENET
+  CEK
+  DIGER
+}
+
+// ---------------------------------------------------------------- tanımlar
+
+model Firma {
+  id           Int     @id @default(autoincrement())
+  unvan        String
+  vkn          String  @unique
+  vergiDairesi String?
+  adres        String?
+  varsayilan   Boolean @default(false)
+  aktif        Boolean @default(true)
+  satislar     Satis[]
+}
+
+model Kullanici {
+  id           Int           @id @default(autoincrement())
+  kullaniciAdi String        @unique
+  adSoyad      String
+  eposta       String?       @unique
+  sifreOzet    String? // boşsa kullanıcı giriş yapamaz (aktarılan personel için şifre sonradan belirlenir)
+  rol          Rol           @default(SATIS)
+  aktif        Boolean       @default(true)
+  sonGiris     DateTime?
+  olusturma    DateTime      @default(now())
+  satislar     Satis[]       @relation("Satici")
+  hedefler     SatisHedefi[]
+}
+
+model Konum {
+  id           Int              @id @default(autoincrement())
+  ad           String           @unique
+  aktif        Boolean          @default(true)
+  araclar      Arac[]
+  transferEski KonumTransferi[] @relation("EskiKonum")
+  transferYeni KonumTransferi[] @relation("YeniKonum")
+}
+
+// ÖTV elle seçilir; bu tablo seçilebilecek oranların listesidir.
+model OtvOrani {
+  id    Int     @id @default(autoincrement())
+  oran  Decimal @unique @db.Decimal(6, 4)
+  aktif Boolean @default(true)
+}
+
+model AracTipi {
+  id                 Int          @id @default(autoincrement())
+  ad                 String       @unique
+  varsayilanOtvOrani Decimal?     @db.Decimal(6, 4) // öneri amaçlı; satışta oran elle seçilir
+  modeller           AracModeli[]
+}
+
+model Marka {
+  id           Int          @id @default(autoincrement())
+  ad           String       @unique
+  iskontoOrani Decimal?     @db.Decimal(6, 4)
+  modeller     AracModeli[]
+}
+
+model AracModeli {
+  id       Int       @id @default(autoincrement())
+  markaId  Int
+  marka    Marka     @relation(fields: [markaId], references: [id])
+  model    String
+  altModel String    @default("")
+  tipId    Int?
+  tip      AracTipi? @relation(fields: [tipId], references: [id])
+  araclar  Arac[]
+
+  @@unique([markaId, model, altModel])
+}
+
+model DovizKuru {
+  id         Int        @id @default(autoincrement())
+  paraBirimi ParaBirimi
+  tarih      DateTime   @db.Date
+  kur        Decimal    @db.Decimal(14, 4)
+
+  @@unique([paraBirimi, tarih])
+}
+
+model KontrolMaddesi {
+  id    Int     @id @default(autoincrement())
+  ad    String  @unique
+  sira  Int
+  aktif Boolean @default(true)
+}
+
+// ---------------------------------------------------------------- cari
+
+model Cari {
+  id            Int           @id @default(autoincrement())
+  tip           CariTip       @default(BIREYSEL)
+  rol           CariRol       @default(MUSTERI)
+  unvan         String
+  tckn          String?
+  vkn           String?
+  vergiDairesi  String?
+  tckkSeriNo    String?
+  dogumTarihi   DateTime?     @db.Date
+  telefon       String? // 10 hane, başında 0 olmadan
+  telefon2      String?
+  eposta        String?
+  il            String?
+  ilce          String?
+  acikAdres     String?
+  eTebligat     Boolean       @default(false)
+  kvkkOnay      Boolean       @default(false)
+  not           String?
+  olusturma     DateTime      @default(now())
+  satislar      Satis[]
+  tahsilatlar   Tahsilat[]
+  hareketler    CariHareket[]
+  garantiler    Garanti[]
+  tedarikEdilen Arac[]        @relation("Tedarikci")
+
+  @@index([tckn])
+  @@index([vkn])
+  @@index([telefon])
+  @@index([unvan])
+}
+
+model CariHareket {
+  id         Int       @id @default(autoincrement())
+  cariId     Int
+  cari       Cari      @relation(fields: [cariId], references: [id])
+  tarih      DateTime
+  borc       Decimal   @default(0) @db.Decimal(14, 2)
+  alacak     Decimal   @default(0) @db.Decimal(14, 2)
+  aciklama   String?
+  satisId    Int?
+  satis      Satis?    @relation(fields: [satisId], references: [id])
+  tahsilatId Int?      @unique
+  tahsilat   Tahsilat? @relation(fields: [tahsilatId], references: [id])
+
+  @@index([cariId, tarih])
+}
+
+// ---------------------------------------------------------------- stok
+
+model Urun {
+  id          Int            @id @default(autoincrement())
+  kod         String         @unique
+  ad          String
+  grup        String?
+  tur         UrunTur
+  birim       String         @default("Adet")
+  barkod      String?
+  kdvOrani    Decimal        @default(0.2) @db.Decimal(6, 4)
+  otvOrani    Decimal        @default(0) @db.Decimal(6, 4)
+  alisFiyati  Decimal?       @db.Decimal(14, 2)
+  satisFiyati Decimal?       @db.Decimal(14, 2)
+  kdvDahil    Boolean        @default(false) // satış fiyatı KDV dahil mi
+  paraBirimi  ParaBirimi     @default(TRY)
+  raf         String?
+  kritikStok  Decimal?       @db.Decimal(14, 3)
+  aktif       Boolean        @default(true)
+  hareketler  StokHareketi[]
+  kalemler    SatisKalemi[]
+
+  @@index([barkod])
+  @@index([ad])
+}
+
+model StokHareketi {
+  id       Int            @id @default(autoincrement())
+  urunId   Int
+  urun     Urun           @relation(fields: [urunId], references: [id])
+  tarih    DateTime       @default(now())
+  tur      StokHareketTur
+  miktar   Decimal        @db.Decimal(14, 3) // giriş +, çıkış -
+  satisId  Int?
+  satis    Satis?         @relation(fields: [satisId], references: [id])
+  aciklama String?
+
+  @@index([urunId, tarih])
+}
+
+// Seri numaralı stok: her araç ayrı kayıt. Teknik servisin de ana anahtarı.
+model Arac {
+  id           Int              @id @default(autoincrement())
+  sase         String           @unique
+  motorNo      String?
+  modelId      Int?
+  model        AracModeli?      @relation(fields: [modelId], references: [id])
+  yil          Int?
+  renk         String?
+  euroStandart String?
+  kondisyon    Kondisyon        @default(SIFIR)
+  durum        AracDurum        @default(STOKTA)
+  konumId      Int?
+  konum        Konum?           @relation(fields: [konumId], references: [id])
+  gelisTarihi  DateTime?        @db.Date
+  tedarikciId  Int?
+  tedarikci    Cari?            @relation("Tedarikci", fields: [tedarikciId], references: [id])
+  alisFaturaNo String?
+  alisSekli    String?
+  kdvOrani     Decimal?         @db.Decimal(6, 4)
+  otvOrani     Decimal?         @db.Decimal(6, 4)
+  // tescil
+  tescilDurum  TescilDurum      @default(TESCILSIZ)
+  plaka        String?
+  ruhsatSeriNo String?
+  tescilTarihi DateTime?        @db.Date
+  not          String?
+  olusturma    DateTime         @default(now())
+  maliyetler   AracMaliyet[]
+  transferler  KonumTransferi[]
+  kalemler     SatisKalemi[]
+  garanti      Garanti?
+
+  @@index([durum])
+  @@index([plaka])
+}
+
+model AracMaliyet {
+  id       Int        @id @default(autoincrement())
+  aracId   Int
+  arac     Arac       @relation(fields: [aracId], references: [id], onDelete: Cascade)
+  tur      MaliyetTur
+  tutar    Decimal    @db.Decimal(14, 2)
+  aciklama String?
+}
+
+model KonumTransferi {
+  id          Int      @id @default(autoincrement())
+  aracId      Int
+  arac        Arac     @relation(fields: [aracId], references: [id])
+  eskiKonumId Int?
+  eskiKonum   Konum?   @relation("EskiKonum", fields: [eskiKonumId], references: [id])
+  yeniKonumId Int
+  yeniKonum   Konum    @relation("YeniKonum", fields: [yeniKonumId], references: [id])
+  yapan       String?
+  tarih       DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- satış
+
+model Satis {
+  id              Int            @id @default(autoincrement())
+  formNo          Int            @unique @default(autoincrement()) // iptal edilen numara yeniden kullanılmaz
+  firmaId         Int?
+  firma           Firma?         @relation(fields: [firmaId], references: [id])
+  cariId          Int
+  cari            Cari           @relation(fields: [cariId], references: [id])
+  saticiId        Int?
+  satici          Kullanici?     @relation("Satici", fields: [saticiId], references: [id])
+  tarih           DateTime
+  durum           SatisDurum     @default(TASLAK)
+  paraBirimi      ParaBirimi     @default(TRY)
+  kur             Decimal        @default(1) @db.Decimal(14, 4)
+  araToplam       Decimal?       @db.Decimal(14, 2)
+  iskontoToplam   Decimal?       @db.Decimal(14, 2)
+  otvToplam       Decimal?       @db.Decimal(14, 2)
+  kdvToplam       Decimal?       @db.Decimal(14, 2)
+  // Satıcının elle belirlediği tutar. Fatura bu tutarla kesilir; ayrı bir fiyat alanı yoktur.
+  genelToplam     Decimal        @db.Decimal(14, 2)
+  teslimTarihi    DateTime?      @db.Date
+  not             String?
+  faturaNo        String?
+  faturaTarihi    DateTime?      @db.Date
+  eFaturaUuid     String?        @unique
+  iptalNedeni     String?
+  iptalEden       String?
+  iptalZamani     DateTime?
+  olusturma       DateTime       @default(now())
+  guncelleme      DateTime       @updatedAt
+  kalemler        SatisKalemi[]
+  tahsilatlar     Tahsilat[]
+  stokHareketleri StokHareketi[]
+  cariHareketleri CariHareket[]
+  teslimKontrol   TeslimKontrol?
+
+  @@index([tarih])
+  @@index([durum])
+}
+
+model SatisKalemi {
+  id           Int     @id @default(autoincrement())
+  satisId      Int
+  satis        Satis   @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  urunId       Int?
+  urun         Urun?   @relation(fields: [urunId], references: [id])
+  aracId       Int?
+  arac         Arac?   @relation(fields: [aracId], references: [id])
+  aciklama     String
+  miktar       Decimal @default(1) @db.Decimal(14, 3)
+  birimFiyat   Decimal @db.Decimal(14, 2) // vergiler hariç
+  iskontoOrani Decimal @default(0) @db.Decimal(6, 4)
+  otvOrani     Decimal @default(0) @db.Decimal(6, 4)
+  kdvOrani     Decimal @default(0.2) @db.Decimal(6, 4)
+  tutar        Decimal @db.Decimal(14, 2) // vergiler dahil satır toplamı
+}
+
+model Tahsilat {
+  id          Int          @id @default(autoincrement())
+  cariId      Int
+  cari        Cari         @relation(fields: [cariId], references: [id])
+  satisId     Int?
+  satis       Satis?       @relation(fields: [satisId], references: [id])
+  tarih       DateTime     @default(now())
+  yontem      OdemeYontem
+  tutar       Decimal      @db.Decimal(14, 2)
+  taksit      Int?
+  vade        DateTime?    @db.Date
+  aciklama    String?
+  kaydeden    String?
+  cariHareket CariHareket?
+}
+
+model Garanti {
+  id        Int      @id @default(autoincrement())
+  aracId    Int      @unique
+  arac      Arac     @relation(fields: [aracId], references: [id])
+  cariId    Int
+  cari      Cari     @relation(fields: [cariId], references: [id])
+  baslangic DateTime @db.Date
+  bitis     DateTime @db.Date
+  kapsam    String?
+}
+
+model TeslimKontrol {
+  id          Int      @id @default(autoincrement())
+  satisId     Int      @unique
+  satis       Satis    @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  maddeler    Json // [{ ad, tamam }]
+  kontrolEden String
+  tarih       DateTime @default(now())
+}
+
+model SatisHedefi {
+  id          Int       @id @default(autoincrement())
+  kullaniciId Int
+  kullanici   Kullanici @relation(fields: [kullaniciId], references: [id])
+  ay          String // yyyy-MM
+  hedefAdet   Int
+  hedefCiro   Decimal   @db.Decimal(14, 2)
+  bazDonem    String
+
+  @@unique([kullaniciId, ay])
+}
+
+model DenetimKaydi {
+  id        Int      @id @default(autoincrement())
+  zaman     DateTime @default(now())
+  kullanici String?
+  islem     String
+  tablo     String
+  kayitId   String?
+  detay     Json?
+
+  @@index([tablo, kayitId])
+}
