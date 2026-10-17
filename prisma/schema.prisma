@@ -169,14 +169,15 @@ model Marka {
 }
 
 model AracModeli {
-  id       Int       @id @default(autoincrement())
-  markaId  Int
-  marka    Marka     @relation(fields: [markaId], references: [id])
-  model    String
-  altModel String    @default("")
-  tipId    Int?
-  tip      AracTipi? @relation(fields: [tipId], references: [id])
-  araclar  Arac[]
+  id        Int            @id @default(autoincrement())
+  markaId   Int
+  marka     Marka          @relation(fields: [markaId], references: [id])
+  model     String
+  altModel  String         @default("")
+  tipId     Int?
+  tip       AracTipi?      @relation(fields: [tipId], references: [id])
+  araclar   Arac[]
+  eslemeler FaturaEsleme[]
 
   @@unique([markaId, model, altModel])
 }
@@ -470,4 +471,12 @@ model Ayar {
   anahtar    String   @id
   deger      String
   guncelleme DateTime @updatedAt
+}
+
+/// Tedarikçi faturasındaki ürün adının onaylanmış model karşılığı (anahtar: tedarikçi VKN | ürün adı)
+model FaturaEsleme {
+  anahtar    String     @id
+  modelId    Int
+  model      AracModeli @relation(fields: [modelId], references: [id])
+  guncelleme DateTime   @updatedAt
 }

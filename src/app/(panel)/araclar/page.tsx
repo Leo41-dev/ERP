@@ -32,7 +32,15 @@ export default async function Araclar({ searchParams }: { searchParams: Promise<
   const bugun = Date.now();
   return (
     <>
-      <SayfaBaslik baslik="Araçlar" aciklama={`${araclar.length} araç${araclar.length === 200 ? " (ilk 200)" : ""}`} sag={k.rol !== "SATIS" && <BaglantiButon href="/araclar/yeni">Araç girişi</BaglantiButon>} />
+      <SayfaBaslik baslik="Araçlar" aciklama={`${araclar.length} araç${araclar.length === 200 ? " (ilk 200)" : ""}`} sag={
+          k.rol !== "SATIS" && (
+            <div className="flex gap-2">
+              {k.rol !== "SERVIS" && <BaglantiButon href="/araclar/fatura" className="!bg-white !text-zinc-800 border border-zinc-300 hover:!bg-zinc-50">Fatura ile giriş</BaglantiButon>}
+              <BaglantiButon href="/araclar/yeni">Araç girişi</BaglantiButon>
+            </div>
+          )
+        }
+      />
       <form className="mb-4 grid gap-2 md:grid-cols-4">
         <Girdi name="q" defaultValue={p.q} placeholder="Şase, plaka, marka veya model" className="md:col-span-2" />
         <Secim name="durum" defaultValue={durum}>
@@ -45,12 +53,16 @@ export default async function Araclar({ searchParams }: { searchParams: Promise<
         </Secim>
         <button className="hidden" />
       </form>
+      <form id="etiket" action="/yazdir/etiket" target="_blank" className="mb-2 flex justify-end">
+        <button className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">Seçilenlerin QR etiketini yazdır</button>
+      </form>
       <Tablo
-        basliklar={["Şase", "Marka / model", "Yıl", "Renk", "Kondisyon", "Konum", "Durum", "Geliş", "Bekleme", ...(maliyet ? ["Maliyet"] : [])]}
+        basliklar={["", "Şase", "Marka / model", "Yıl", "Renk", "Kondisyon", "Konum", "Durum", "Geliş", "Bekleme", ...(maliyet ? ["Maliyet"] : [])]}
         bos={!araclar.length}
       >
         {araclar.map((a) => (
           <tr key={a.id} className="hover:bg-zinc-50">
+            <Hucre><input type="checkbox" name="id" value={a.id} form="etiket" aria-label={`${a.sase} etiketi`} /></Hucre>
             <Hucre><Link href={`/araclar/${a.id}`} className="font-mono font-medium hover:underline">{a.sase}</Link></Hucre>
             <Hucre>{a.model ? `${a.model.marka.ad} ${a.model.altModel || a.model.model}` : "-"}</Hucre>
             <Hucre>{a.yil ?? "-"}</Hucre>

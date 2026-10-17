@@ -50,6 +50,7 @@ export default async function AracDetay({ params }: { params: Promise<{ id: stri
         aciklama={`${ARAC_DURUM_AD[a.durum]} · ${a.konum?.ad ?? "konum yok"}`}
         sag={
           <div className="flex gap-2">
+            <BaglantiButon href={`/yazdir/etiket?id=${a.id}`} target="_blank" className="!bg-white !text-zinc-800 border border-zinc-300 hover:!bg-zinc-50">QR etiket</BaglantiButon>
             {a.durum === "STOKTA" && <BaglantiButon href={`/satislar/yeni?arac=${a.id}`}>Satış yap</BaglantiButon>}
             {k.rol !== "SATIS" && <BaglantiButon href={`/araclar/${a.id}/duzenle`} className="bg-zinc-600">Düzenle</BaglantiButon>}
           </div>
