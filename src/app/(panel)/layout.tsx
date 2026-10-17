@@ -9,7 +9,7 @@ export default async function PanelDuzeni({ children }: { children: ReactNode })
   const ogeler = [
     { href: "/", ad: "Pano" },
     { href: "/satislar", ad: "Satışlar" },
-    ...(k.rol !== "DEPO" ? [{ href: "/satislar/hizli", ad: "Hızlı satış" }] : []),
+    ...(k.rol !== "DEPO" ? [{ href: "/satislar/hizli", ad: "Hızlı satış" }, { href: "/teklifler", ad: "Teklifler" }] : []),
     ...(k.rol !== "DEPO" ? [{ href: "/tahsilat", ad: "Tahsilat" }] : []),
     { href: "/araclar", ad: "Araçlar" },
     { href: "/musteriler", ad: "Müşteriler" },

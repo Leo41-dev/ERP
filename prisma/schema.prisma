@@ -94,6 +94,12 @@ enum SatisDurum {
   IPTAL
 }
 
+enum TeklifDurum {
+  ACIK
+  KABUL // satışa dönüştü
+  RET
+}
+
 enum OdemeYontem {
   HAVALE
   KART
@@ -106,14 +112,15 @@ enum OdemeYontem {
 // ---------------------------------------------------------------- tanımlar
 
 model Firma {
-  id           Int     @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   unvan        String
-  vkn          String  @unique
+  vkn          String   @unique
   vergiDairesi String?
   adres        String?
-  varsayilan   Boolean @default(false)
-  aktif        Boolean @default(true)
+  varsayilan   Boolean  @default(false)
+  aktif        Boolean  @default(true)
   satislar     Satis[]
+  teklifler    Teklif[]
 }
 
 model Kullanici {
@@ -130,6 +137,7 @@ model Kullanici {
   oturumlar    Oturum[]
   olusturma    DateTime      @default(now())
   satislar     Satis[]       @relation("Satici")
+  teklifler    Teklif[]      @relation("TeklifSatici")
   hedefler     SatisHedefi[]
 }
 
@@ -174,15 +182,16 @@ model Marka {
 }
 
 model AracModeli {
-  id        Int            @id @default(autoincrement())
-  markaId   Int
-  marka     Marka          @relation(fields: [markaId], references: [id])
-  model     String
-  altModel  String         @default("")
-  tipId     Int?
-  tip       AracTipi?      @relation(fields: [tipId], references: [id])
-  araclar   Arac[]
-  eslemeler FaturaEsleme[]
+  id              Int            @id @default(autoincrement())
+  markaId         Int
+  marka           Marka          @relation(fields: [markaId], references: [id])
+  model           String
+  altModel        String         @default("")
+  tipId           Int?
+  tip             AracTipi?      @relation(fields: [tipId], references: [id])
+  araclar         Arac[]
+  eslemeler       FaturaEsleme[]
+  teklifKalemleri TeklifKalemi[]
 
   @@unique([markaId, model, altModel])
 }
@@ -226,6 +235,7 @@ model Cari {
   not           String?
   olusturma     DateTime      @default(now())
   satislar      Satis[]
+  teklifler     Teklif[]
   tahsilatlar   Tahsilat[]
   hareketler    CariHareket[]
   garantiler    Garanti[]
@@ -390,6 +400,7 @@ model Satis {
   stokHareketleri StokHareketi[]
   cariHareketleri CariHareket[]
   teslimKontrol   TeslimKontrol?
+  teklif          Teklif?
 
   @@index([tarih])
   @@index([durum])
@@ -433,6 +444,54 @@ model Tahsilat {
   cariHareket  CariHareket?
 
   @@index([yontem, vade])
+}
+
+// Teklif cari açmaz: müşteri bilgisi teklifin üzerinde durur; kimlik ya da telefon kayıtlıysa cariye bağlanır.
+model Teklif {
+  id             Int            @id @default(autoincrement())
+  teklifNo       Int            @unique @default(autoincrement())
+  firmaId        Int?
+  firma          Firma?         @relation(fields: [firmaId], references: [id])
+  cariId         Int?
+  cari           Cari?          @relation(fields: [cariId], references: [id])
+  musteriAd      String
+  telefon        String?
+  eposta         String?
+  kimlikNo       String?
+  saticiId       Int?
+  satici         Kullanici?     @relation("TeklifSatici", fields: [saticiId], references: [id])
+  tarih          DateTime       @default(now())
+  gecerlilik     DateTime       @db.Date
+  durum          TeklifDurum    @default(ACIK)
+  araToplam      Decimal        @db.Decimal(14, 2)
+  otvToplam      Decimal        @db.Decimal(14, 2)
+  kdvToplam      Decimal        @db.Decimal(14, 2)
+  genelToplam    Decimal        @db.Decimal(14, 2)
+  odemeKosullari String?
+  not            String?
+  retNedeni      String?
+  satisId        Int?           @unique
+  satis          Satis?         @relation(fields: [satisId], references: [id])
+  guncelleme     DateTime       @updatedAt
+  kalemler       TeklifKalemi[]
+
+  @@index([durum, tarih])
+  @@index([telefon])
+}
+
+model TeklifKalemi {
+  id         Int         @id @default(autoincrement())
+  teklifId   Int
+  teklif     Teklif      @relation(fields: [teklifId], references: [id], onDelete: Cascade)
+  sira       Int
+  modelId    Int? // araç satırıysa model; satışa dönüşürken bu modelin stoktaki araçları önerilir
+  model      AracModeli? @relation(fields: [modelId], references: [id])
+  aciklama   String
+  miktar     Decimal     @db.Decimal(14, 3)
+  birimFiyat Decimal     @db.Decimal(14, 2) // vergiler dahil
+  otvOrani   Decimal     @default(0) @db.Decimal(6, 4)
+  kdvOrani   Decimal     @default(0.2) @db.Decimal(6, 4)
+  tutar      Decimal     @db.Decimal(14, 2) // vergiler dahil
 }
 
 model Garanti {

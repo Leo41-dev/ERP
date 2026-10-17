@@ -13,10 +13,12 @@ const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currenc
 const KDV = ["0.2", "0.1", "0.01", "0"];
 const bosKalem = (): Kalem => ({ anahtar: Date.now() + Math.random(), aciklama: "", miktar: "1", fiyat: "", kdv: "0.2" });
 
-export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number; unvan: string; varsayilan: boolean }[]; oneriler: string[] }) {
+export type TekliftenHizli = { id: number; no: number; unvan: string; telefon: string; kimlikNo: string; kalemler: Omit<Kalem, "anahtar">[] };
+
+export function HizliSatisFormu({ firmalar, oneriler, teklif }: { firmalar: { id: number; unvan: string; varsayilan: boolean }[]; oneriler: string[]; teklif?: TekliftenHizli }) {
   const [durum, gonder, bekliyor] = useActionState(hizliSatisKaydet, undefined);
   const h = durum?.hatalar ?? {};
-  const [kalemler, setKalemler] = useState<Kalem[]>([bosKalem()]);
+  const [kalemler, setKalemler] = useState<Kalem[]>(() => (teklif?.kalemler.length ? teklif.kalemler.map((x) => ({ ...x, anahtar: Date.now() + Math.random() })) : [bosKalem()]));
   const [odemeler, setOdemeler] = useState<Odeme[]>([yeniOdeme("KART")]);
   const [tutarElle, setTutarElle] = useState(false);
 
@@ -37,6 +39,12 @@ export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number
   return (
     <form onSubmit={sifirlamadan(gonder)} className="space-y-4">
       <HataKutusu mesaj={durum?.genel} />
+      {teklif && (
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <input type="hidden" name="teklifId" value={teklif.id} />
+          {teklif.no} numaralı teklif satışa dönüştürülüyor; kalemler ve müşteri bilgisi aktarıldı.
+        </p>
+      )}
 
       <Kart baslik="Ürün ve hizmetler" sag={<span className="text-sm font-semibold">{tl(hesap.genelToplam)}</span>}>
         <datalist id="hs-oneriler">{oneriler.map((o) => <option key={o} value={o} />)}</datalist>
@@ -85,9 +93,9 @@ export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number
 
       <Kart baslik="Müşteri (isteğe bağlı)">
         <div className="grid gap-3 md:grid-cols-4">
-          <Alan etiket="Ad soyad / unvan" hata={h.unvan}><Girdi name="unvan" className="uppercase" /></Alan>
-          <Alan etiket="Telefon" hata={h.telefon}><Girdi name="telefon" inputMode="tel" placeholder="5xx xxx xx xx" /></Alan>
-          <Alan etiket="TCKN / VKN (fatura için)" hata={h.kimlikNo}><Girdi name="kimlikNo" inputMode="numeric" /></Alan>
+          <Alan etiket="Ad soyad / unvan" hata={h.unvan}><Girdi name="unvan" defaultValue={teklif?.unvan} className="uppercase" /></Alan>
+          <Alan etiket="Telefon" hata={h.telefon}><Girdi name="telefon" defaultValue={teklif?.telefon} inputMode="tel" placeholder="5xx xxx xx xx" /></Alan>
+          <Alan etiket="TCKN / VKN (fatura için)" hata={h.kimlikNo}><Girdi name="kimlikNo" defaultValue={teklif?.kimlikNo} inputMode="numeric" /></Alan>
           {firmalar.length > 1 ? (
             <Alan etiket="Satışı yapan firma">
               <Secim name="firmaId" defaultValue={String(firmalar.find((f) => f.varsayilan)?.id ?? firmalar[0].id)}>

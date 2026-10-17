@@ -7,19 +7,25 @@ import { sayi } from "@/lib/normalize";
 import { vergiKirilimi } from "@/lib/satis/hesap";
 import { musteriBul, satisKaydet } from "./eylem";
 
-type Arac = { id: number; etiket: string; kdv: number | null; otv: number | null };
+type Arac = { id: number; modelId: number | null; etiket: string; kdv: number | null; otv: number | null };
+export type TekliftenSatis = {
+  id: number; no: number; modelId: number; modelAd: string; tutar: string; kdv: string; otv: string; digerler: string; digerTutar: number; toplam: number; not: string;
+  musteri: { unvan: string; telefon: string; eposta: string; kimlikNo: string };
+};
 
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const yuzde = (o: number) => `%${(o * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 
-export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; secili?: number; otvOranlari: number[] }) {
+export function SatisFormu({ araclar, secili, otvOranlari, teklif }: { araclar: Arac[]; secili?: number; otvOranlari: number[]; teklif?: TekliftenSatis }) {
   const [durum, gonder, bekliyor] = useActionState(satisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const ilk = araclar.find((a) => a.id === secili);
   const [aracId, setAracId] = useState(ilk ? String(ilk.id) : "");
-  const [kdv, setKdv] = useState(String(ilk?.kdv ?? 0.2));
-  const [otv, setOtv] = useState(ilk?.otv !== null && ilk?.otv !== undefined ? String(ilk.otv) : "");
-  const [toplam, setToplam] = useState("");
+  const [kdv, setKdv] = useState(teklif?.kdv ?? String(ilk?.kdv ?? 0.2));
+  const [otv, setOtv] = useState(teklif?.otv ?? (ilk?.otv !== null && ilk?.otv !== undefined ? String(ilk.otv) : ""));
+  const [toplam, setToplam] = useState(teklif?.tutar ?? "");
+  const uygun = teklif ? araclar.filter((a) => a.modelId === teklif.modelId) : [];
+  const digerAraclar = teklif ? araclar.filter((a) => a.modelId !== teklif.modelId) : araclar;
   const [odemeler, setOdemeler] = useState<Odeme[]>([yeniOdeme("HAVALE")]);
   const [bulMesaj, setBulMesaj] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
@@ -31,6 +37,7 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
   const aracSec = (id: string) => {
     setAracId(id);
     const a = araclar.find((x) => String(x.id) === id);
+    if (teklif) return; // fiyat ve vergi oranları tekliften gelir
     if (a?.kdv !== null && a?.kdv !== undefined) setKdv(String(a.kdv));
     if (a?.otv !== null && a?.otv !== undefined) setOtv(String(a.otv));
   };
@@ -54,12 +61,28 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
   return (
     <form ref={formRef} onSubmit={sifirlamadan(gonder)} className="space-y-4">
       <HataKutusu mesaj={durum?.genel} />
+      {teklif && (
+        <div className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <input type="hidden" name="teklifId" value={teklif.id} />
+          {teklif.no} numaralı teklif ({teklif.toplam.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}) satışa dönüştürülüyor. Araç satırının fiyatı ve vergi oranları forma aktarıldı.
+          {teklif.digerler && ` Diğer kalemler aksesuar alanına yazıldı${teklif.digerTutar ? `; fiyatlı olanlar (${teklif.digerTutar.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}) satış tutarına dahil değil, ayrıca hızlı satışla girilebilir` : ""}.`}
+        </div>
+      )}
       <Kart baslik="Araç">
         <div className="grid gap-4 md:grid-cols-3">
           <Alan etiket="Stoktaki araç" hata={h.aracId} className="md:col-span-3">
             <Secim name="aracId" value={aracId} onChange={(e) => aracSec(e.target.value)} required>
-              <option value="">Araç seçin</option>
-              {araclar.map((a) => <option key={a.id} value={a.id}>{a.etiket}</option>)}
+              <option value="">{teklif ? `Araç seçin (teklifteki model: ${teklif.modelAd})` : "Araç seçin"}</option>
+              {teklif && (
+                <optgroup label={uygun.length ? `Teklifteki model · ${uygun.length} araç` : "Teklifteki model stokta yok"}>
+                  {uygun.map((a) => <option key={a.id} value={a.id}>{a.etiket}</option>)}
+                </optgroup>
+              )}
+              {teklif ? (
+                <optgroup label="Diğer araçlar">{digerAraclar.map((a) => <option key={a.id} value={a.id}>{a.etiket}</option>)}</optgroup>
+              ) : (
+                araclar.map((a) => <option key={a.id} value={a.id}>{a.etiket}</option>)
+              )}
             </Secim>
           </Alan>
         </div>
@@ -69,14 +92,14 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
         <div className="grid gap-4 md:grid-cols-3">
           <Alan etiket="TCKN / VKN" hata={h.kimlikNo}>
             <div className="flex gap-2">
-              <Girdi name="kimlikNo" inputMode="numeric" required />
+              <Girdi name="kimlikNo" defaultValue={teklif?.musteri.kimlikNo} inputMode="numeric" required />
               <Buton type="button" tur="ikincil" onClick={musteriGetir}>Getir</Buton>
             </div>
             {bulMesaj && <span className="mt-1 block text-xs text-zinc-500">{bulMesaj}</span>}
           </Alan>
-          <Alan etiket="Ad soyad / ünvan" hata={h.unvan} className="md:col-span-2"><Girdi name="unvan" required /></Alan>
-          <Alan etiket="Cep telefonu" hata={h.telefon}><Girdi name="telefon" inputMode="tel" placeholder="5xx xxx xx xx" required /></Alan>
-          <Alan etiket="E-posta" hata={h.eposta}><Girdi name="eposta" type="email" /></Alan>
+          <Alan etiket="Ad soyad / ünvan" hata={h.unvan} className="md:col-span-2"><Girdi name="unvan" defaultValue={teklif?.musteri.unvan} required /></Alan>
+          <Alan etiket="Cep telefonu" hata={h.telefon}><Girdi name="telefon" defaultValue={teklif?.musteri.telefon} inputMode="tel" placeholder="5xx xxx xx xx" required /></Alan>
+          <Alan etiket="E-posta" hata={h.eposta}><Girdi name="eposta" defaultValue={teklif?.musteri.eposta} type="email" /></Alan>
           <Alan etiket="Vergi dairesi (kurumsal)"><Girdi name="vergiDairesi" /></Alan>
           <Alan etiket="TCKK seri no"><Girdi name="tckkSeriNo" /></Alan>
           <Alan etiket="Doğum tarihi" hata={h.dogumTarihi}><Girdi name="dogumTarihi" type="date" /></Alan>
@@ -126,9 +149,9 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
       <Kart baslik="Teslim ve notlar">
         <div className="grid gap-4 md:grid-cols-3">
           <Alan etiket="Teslim tarihi" hata={h.teslimTarihi}><Girdi name="teslimTarihi" type="date" /></Alan>
-          <Alan etiket="Aksesuarlar" className="md:col-span-2"><Girdi name="aksesuarlar" placeholder="Kask, çanta..." /></Alan>
+          <Alan etiket="Aksesuarlar" className="md:col-span-2"><Girdi name="aksesuarlar" defaultValue={teklif?.digerler} placeholder="Kask, çanta..." /></Alan>
           <Alan etiket="Hizmetler" className="md:col-span-3"><Girdi name="hizmetler" placeholder="Tescil takibi, nakliye..." /></Alan>
-          <Alan etiket="Not" className="md:col-span-3"><MetinAlani name="not" /></Alan>
+          <Alan etiket="Not" className="md:col-span-3"><MetinAlani name="not" defaultValue={teklif?.not} /></Alan>
         </div>
       </Kart>
 

@@ -15,6 +15,13 @@ export const BELGE_AYARLARI = {
   },
   "belge.fisBaslik": { ad: "Hızlı satış fişi başlığı", varsayilan: "SATIŞ FİŞİ", cokSatir: false },
   "belge.fisNotu": { ad: "Hızlı satış fişi alt metni", varsayilan: "Bu fiş bilgi amaçlıdır; faturanız ayrıca düzenlenir. Teşekkür ederiz.", cokSatir: true },
+  "belge.teklifBaslik": { ad: "Teklif başlığı", varsayilan: "FİYAT TEKLİFİ", cokSatir: false },
+  "belge.teklifNotu": {
+    ad: "Teklif alt metni",
+    varsayilan: "Fiyatlarımıza KDV ve ÖTV dahildir. Teklif, geçerlilik tarihine kadar ve stok durumuna bağlı olarak geçerlidir.",
+    cokSatir: true,
+  },
+  "belge.teklifGun": { ad: "Teklif geçerlilik süresi (gün)", varsayilan: "7", cokSatir: false },
   "belge.kontrolEden": { ad: "Varsayılan kontrol eden", varsayilan: "", cokSatir: false },
 } as const;
 

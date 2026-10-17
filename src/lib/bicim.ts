@@ -33,3 +33,12 @@ export const SATIS_DURUM_AD: Record<string, string> = { TASLAK: "Taslak", KAYITL
 export const ODEME_AD: Record<string, string> = { HAVALE: "Havale/EFT", KART: "Kredi kartı", NAKIT: "Nakit", SENET: "Senet", CEK: "Çek", DIGER: "Diğer" };
 export const TESCIL_AD: Record<string, string> = { TESCILSIZ: "Tescilsiz", BASVURUDA: "Başvuruda", TESCILLI: "Tescilli" };
 export const SATIS_DURUM_RENK = { TASLAK: "gri", KAYITLI: "sari", FATURALANDI: "yesil", IPTAL: "kirmizi" } as const;
+
+/** Teklif durumu; açık teklifin geçerlilik tarihi geçmişse "süresi doldu" gösterilir. */
+export function teklifDurum(t: { durum: string; gecerlilik: Date }) {
+  if (t.durum === "KABUL") return { ad: "Satışa döndü", renk: "yesil" } as const;
+  if (t.durum === "RET") return { ad: "Reddedildi", renk: "kirmizi" } as const;
+  const bugun = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 10);
+  if (t.gecerlilik.toISOString().slice(0, 10) < bugun) return { ad: "Süresi doldu", renk: "gri" } as const;
+  return { ad: "Açık", renk: "mavi" } as const;
+}

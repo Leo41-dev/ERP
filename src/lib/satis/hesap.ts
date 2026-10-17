@@ -31,3 +31,15 @@ export function kalemHesapla(kalemler: KalemGirdisi[]) {
   const toplam = (a: "tutar" | "matrah" | "kdv") => para(satirlar.reduce((t, s) => t + s[a], 0));
   return { satirlar, genelToplam: toplam("tutar"), matrah: toplam("matrah"), kdv: toplam("kdv") };
 }
+
+export type TeklifKalemGirdisi = { aciklama: string; modelId: number | null; miktar: number; birimFiyat: number; kdvOrani: number; otvOrani: number }; // birim fiyat vergiler dahil
+
+/** Teklif kalemleri: vergiler dahil birim fiyattan satır tutarı ve satır bazında ÖTV/KDV kırılımı */
+export function teklifHesapla(kalemler: TeklifKalemGirdisi[]) {
+  const satirlar = kalemler.map((k) => {
+    const tutar = para(k.miktar * k.birimFiyat);
+    return { ...k, tutar, ...vergiKirilimi(tutar, k.kdvOrani, k.otvOrani) };
+  });
+  const toplam = (a: "tutar" | "matrah" | "otv" | "kdv") => para(satirlar.reduce((t, s) => t + s[a], 0));
+  return { satirlar, genelToplam: toplam("tutar"), matrah: toplam("matrah"), otv: toplam("otv"), kdv: toplam("kdv") };
+}

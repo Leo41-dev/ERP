@@ -66,3 +66,18 @@ describe("hizliSatisDogrula", () => {
     expect(hatalar.unvan).toBeTruthy();
   });
 });
+
+describe("teklifHesapla", () => {
+  it("araç ve aksesuar satırlarının vergisini ayrı hesaplar", async () => {
+    const { teklifHesapla } = await import("../src/lib/satis/hesap");
+    const h = teklifHesapla([
+      { aciklama: "CFMOTO CFORCE 625", modelId: 1, miktar: 1, birimFiyat: 450000, kdvOrani: 0.2, otvOrani: 0.08 },
+      { aciklama: "KASK", modelId: null, miktar: 2, birimFiyat: 3000, kdvOrani: 0.2, otvOrani: 0 },
+    ]);
+    expect(h.genelToplam).toBe(456000);
+    expect(h.satirlar[1].otv).toBe(0);
+    expect(h.satirlar[1].kdv).toBe(1000);
+    expect(h.matrah + h.otv + h.kdv).toBeCloseTo(456000, 2);
+    expect(h.otv).toBeCloseTo(27777.78, 2);
+  });
+});

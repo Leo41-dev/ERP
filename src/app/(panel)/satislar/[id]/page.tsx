@@ -14,7 +14,7 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
   const s = Number.isInteger(id)
     ? await db.satis.findUnique({
         where: { id },
-        include: { cari: true, satici: true, kalemler: { include: { arac: { include: { maliyetler: true } } } }, tahsilatlar: { orderBy: { tarih: "asc" } }, teslimKontrol: true },
+        include: { cari: true, satici: true, kalemler: { include: { arac: { include: { maliyetler: true } } } }, tahsilatlar: { orderBy: { tarih: "asc" } }, teslimKontrol: true, teklif: { select: { id: true, teklifNo: true } } },
       })
     : null;
   if (!s || (k.rol === "SATIS" && s.saticiId !== k.id)) notFound();
@@ -31,7 +31,7 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
     <>
       <SayfaBaslik
         baslik={`${s.tur === "HIZLI" ? "Hızlı satış" : "Satış"} ${s.formNo}`}
-        aciklama={`${tarihSaat(s.tarih)} · ${s.satici?.adSoyad ?? "-"}`}
+        aciklama={<>{tarihSaat(s.tarih)} · {s.satici?.adSoyad ?? "-"}{s.teklif && <> · <Link href={`/teklifler/${s.teklif.id}`} className="hover:underline">{s.teklif.teklifNo} numaralı tekliften</Link></>}</>}
         sag={
           <div className="flex items-center gap-2">
             <Etiket renk={SATIS_DURUM_RENK[s.durum]}>{SATIS_DURUM_AD[s.durum]}</Etiket>

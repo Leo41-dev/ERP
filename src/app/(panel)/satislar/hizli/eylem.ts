@@ -68,6 +68,13 @@ export async function hizliSatisKaydet(_: HizliSatisDurum, form: FormData): Prom
       },
     });
     await tx.cariHareket.create({ data: { cariId: cari.id, tarih: s.tarih, borc: dec(h.genelToplam), aciklama: `Hızlı satış ${s.formNo}`, satisId: s.id } });
+    const teklifId = Number(form.get("teklifId")) || null;
+    if (teklifId) {
+      await tx.teklif.updateMany({
+        where: { id: teklifId, durum: "ACIK", satisId: null, ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) },
+        data: { durum: "KABUL", satisId: s.id, cariId: cari.id },
+      });
+    }
     for (const o of v.odemeler) {
       const t = await tx.tahsilat.create({ data: { cariId: cari.id, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: o.aciklama, kaydeden: k.adSoyad } });
       await tx.cariHareket.create({ data: { cariId: cari.id, tarih: t.tarih, alacak: dec(o.tutar), aciklama: `Tahsilat (satış ${s.formNo})`, satisId: s.id, tahsilatId: t.id } });
@@ -76,5 +83,6 @@ export async function hizliSatisKaydet(_: HizliSatisDurum, form: FormData): Prom
     return s.id;
   });
   revalidatePath("/satislar");
+  revalidatePath("/teklifler");
   redirect(`/satislar/hizli?kayit=${id}`);
 }

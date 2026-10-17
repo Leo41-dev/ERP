@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
-import { SATIS_DURUM_AD, tarih, telefonGoster, tl } from "@/lib/bicim";
+import { SATIS_DURUM_AD, tarih, teklifDurum, telefonGoster, tl } from "@/lib/bicim";
 import { cariEkstre } from "@/lib/cari";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
@@ -15,6 +15,7 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
         include: {
           satislar: { orderBy: { tarih: "desc" }, include: { kalemler: { include: { arac: true } }, satici: true } },
           garantiler: { include: { arac: true } },
+          teklifler: { orderBy: { tarih: "desc" }, take: 20, include: { kalemler: { orderBy: { sira: "asc" }, select: { aciklama: true } } } },
         },
       })
     : null;
@@ -71,6 +72,26 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
           </tr>
         ))}
       </Tablo>
+
+      {c.teklifler.length > 0 && k.rol !== "DEPO" && (
+        <>
+          <h2 className="mb-2 mt-6 text-sm font-semibold">Teklifler</h2>
+          <Tablo basliklar={["No", "Tarih", "Kalemler", "Tutar", "Durum"]}>
+            {c.teklifler.filter((t) => k.rol !== "SATIS" || t.saticiId === k.id).map((t) => {
+              const d = teklifDurum(t);
+              return (
+                <tr key={t.id}>
+                  <Hucre><Link href={`/teklifler/${t.id}`} className="font-medium hover:underline">{t.teklifNo}</Link></Hucre>
+                  <Hucre>{tarih(t.tarih)}</Hucre>
+                  <Hucre className="max-w-72 truncate">{t.kalemler.map((x) => x.aciklama).join(", ")}</Hucre>
+                  <Hucre>{tl(t.genelToplam)}</Hucre>
+                  <Hucre><Etiket renk={d.renk}>{d.ad}</Etiket></Hucre>
+                </tr>
+              );
+            })}
+          </Tablo>
+        </>
+      )}
 
       <div className="mb-2 mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Cari ekstre</h2>

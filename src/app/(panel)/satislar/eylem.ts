@@ -39,9 +39,10 @@ export async function satisKaydet(_: SatisDurum, form: FormData): Promise<SatisD
     return { uyari: `Ödemeler satış tutarından ${Math.abs(fark).toLocaleString("tr-TR")} ₺ ${yon}. Yine de kaydetmek için tekrar Kaydet'e basın.`, onayIste: true };
   }
   try {
-    const id = await satisOlustur(k, musteri.veri, v);
+    const id = await satisOlustur(k, musteri.veri, v, Number(form.get("teklifId")) || null);
     revalidatePath("/satislar");
     revalidatePath("/araclar");
+    revalidatePath("/teklifler");
     redirect(`/satislar/${id}`);
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("ARAC:")) return { genel: e.message.slice(5) };
@@ -49,7 +50,7 @@ export async function satisKaydet(_: SatisDurum, form: FormData): Promise<SatisD
   }
 }
 
-async function satisOlustur(k: OturumKullanici, m: ReturnType<typeof cariDogrula>["veri"], v: ReturnType<typeof satisDogrula>["veri"]) {
+async function satisOlustur(k: OturumKullanici, m: ReturnType<typeof cariDogrula>["veri"], v: ReturnType<typeof satisDogrula>["veri"], teklifId: number | null) {
   const vergi = vergiKirilimi(v.genelToplam, v.kdvOrani, v.otvOrani);
   return db.$transaction(async (tx) => {
     // aracı yalnızca hâlâ stoktaysa rezerve et (aynı aracın iki kez satılmasını önler)
@@ -101,6 +102,13 @@ async function satisOlustur(k: OturumKullanici, m: ReturnType<typeof cariDogrula
       },
     });
     await tx.cariHareket.create({ data: { cariId, tarih: s.tarih, borc: dec(v.genelToplam), aciklama: `Satış ${s.formNo}`, satisId: s.id } });
+    if (teklifId) {
+      const t = await tx.teklif.updateMany({
+        where: { id: teklifId, durum: "ACIK", satisId: null, ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) },
+        data: { durum: "KABUL", satisId: s.id, cariId },
+      });
+      if (t.count !== 1) throw new Error("ARAC:Teklif artık açık değil; başka bir satışa dönüşmüş olabilir.");
+    }
     for (const o of v.odemeler) {
       const t = await tx.tahsilat.create({
         data: { cariId, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: o.aciklama, kaydeden: k.adSoyad },

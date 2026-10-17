@@ -5,12 +5,14 @@ import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { HizliSatisFormu } from "./HizliSatisFormu";
 
-export default async function HizliSatis({ searchParams }: { searchParams: Promise<{ kayit?: string }> }) {
+export default async function HizliSatis({ searchParams }: { searchParams: Promise<{ kayit?: string; teklif?: string }> }) {
   const k = await yetkiIste("SATIS", "MUHASEBE", "SERVIS");
-  const kayitId = Number((await searchParams).kayit) || null;
+  const p = await searchParams;
+  const kayitId = Number(p.kayit) || null;
+  const teklifId = Number(p.teklif) || null;
   // Türkiye saatiyle bugünün başı (UTC+3, yaz saati yok)
   const gunBasi = new Date(Math.floor((Date.now() + 3 * 3_600_000) / 86_400_000) * 86_400_000 - 3 * 3_600_000);
-  const [firmalar, oncekiler, kayit, bugun] = await Promise.all([
+  const [firmalar, oncekiler, kayit, bugun, t] = await Promise.all([
     db.firma.findMany({ where: { aktif: true }, orderBy: { id: "asc" }, select: { id: true, unvan: true, varsayilan: true } }),
     // sık yazılan ürün/hizmet adları öneri olarak gelir
     db.satisKalemi.findMany({ where: { satis: { tur: "HIZLI" } }, distinct: ["aciklama"], orderBy: { id: "desc" }, take: 300, select: { aciklama: true } }),
@@ -20,7 +22,21 @@ export default async function HizliSatis({ searchParams }: { searchParams: Promi
       orderBy: { tarih: "desc" },
       include: { kalemler: { select: { aciklama: true } }, tahsilatlar: { select: { yontem: true } } },
     }),
+    teklifId && !kayitId
+      ? db.teklif.findFirst({ where: { id: teklifId, durum: "ACIK", ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) }, include: { kalemler: { orderBy: { sira: "asc" } } } })
+      : null,
   ]);
+  const virgul = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 3, useGrouping: false });
+  const teklif = t
+    ? {
+        id: t.id,
+        no: t.teklifNo,
+        unvan: t.musteriAd,
+        telefon: t.telefon ?? "",
+        kimlikNo: t.kimlikNo ?? "",
+        kalemler: t.kalemler.map((x) => ({ aciklama: x.aciklama, miktar: virgul(Number(x.miktar)), fiyat: virgul(Number(x.birimFiyat)), kdv: String(Number(x.kdvOrani)) })),
+      }
+    : undefined;
   const gunToplam = bugun.filter((s) => s.durum !== "IPTAL").reduce((t, s) => t + Number(s.genelToplam), 0);
 
   return (
@@ -37,7 +53,7 @@ export default async function HizliSatis({ searchParams }: { searchParams: Promi
           </div>
         </Kart>
       )}
-      <HizliSatisFormu key={kayitId ?? "yeni"} firmalar={firmalar} oneriler={oncekiler.map((x) => x.aciklama)} />
+      <HizliSatisFormu key={kayitId ?? teklifId ?? "yeni"} teklif={teklif} firmalar={firmalar} oneriler={oncekiler.map((x) => x.aciklama)} />
 
       <h2 className="mb-2 mt-8 text-sm font-semibold">Bugünkü hızlı satışlar · {tl(gunToplam)}</h2>
       <Tablo basliklar={["No", "Saat", "Kalemler", "Ödeme", "Tutar", ""]} bos={!bugun.length}>
