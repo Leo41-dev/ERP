@@ -414,19 +414,25 @@ model SatisKalemi {
 }
 
 model Tahsilat {
-  id          Int          @id @default(autoincrement())
-  cariId      Int
-  cari        Cari         @relation(fields: [cariId], references: [id])
-  satisId     Int?
-  satis       Satis?       @relation(fields: [satisId], references: [id])
-  tarih       DateTime     @default(now())
-  yontem      OdemeYontem
-  tutar       Decimal      @db.Decimal(14, 2)
-  taksit      Int?
-  vade        DateTime?    @db.Date
-  aciklama    String?
-  kaydeden    String?
-  cariHareket CariHareket?
+  id           Int          @id @default(autoincrement())
+  cariId       Int
+  cari         Cari         @relation(fields: [cariId], references: [id])
+  satisId      Int?
+  satis        Satis?       @relation(fields: [satisId], references: [id])
+  tarih        DateTime     @default(now())
+  yontem       OdemeYontem
+  tutar        Decimal      @db.Decimal(14, 2)
+  taksit       Int?
+  vade         DateTime?    @db.Date // senet / çek vadesi
+  tahsilTarihi DateTime?    @db.Date // senet / çek tahsil edildiğinde
+  aciklama     String?
+  kaydeden     String?
+  iptalNedeni  String?
+  iptalEden    String?
+  iptalZamani  DateTime? // iptal edilen tahsilat silinmez, cariye ters kayıt atılır
+  cariHareket  CariHareket?
+
+  @@index([yontem, vade])
 }
 
 model Garanti {

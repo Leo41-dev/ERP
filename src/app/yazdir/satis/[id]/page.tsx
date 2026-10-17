@@ -5,7 +5,7 @@ import { KONDISYON_AD, ODEME_AD, TESCIL_AD, tarih, telefonGoster, tl, yuzde } fr
 import { belgeAyarlari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
-import { YazdirButon } from "./YazdirButon";
+import { YazdirButon } from "@/components/YazdirButon";
 
 export const metadata = { title: "Satış formu" };
 

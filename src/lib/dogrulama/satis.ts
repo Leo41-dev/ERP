@@ -50,12 +50,16 @@ export function satisDogrula(f: FormData): { veri: SatisVeri; hatalar: Hatalar }
   };
 }
 
-/** Formdaki ödeme satırları (odeme_yontem, odeme_tutar, odeme_taksit, odeme_aciklama); boş satırlar atlanır. */
+/**
+ * Formdaki ödeme satırları (odeme_yontem, odeme_tutar, odeme_taksit, odeme_vade, odeme_aciklama); boş satırlar atlanır.
+ * Taksit yalnızca kartta, vade yalnızca senet ve çekte alınır (senet/çekte zorunlu).
+ */
 export function odemeSatirlari(f: FormData, h: Hatalar): OdemeSatiri[] {
   const yontemler = f.getAll("odeme_yontem").map(String);
   const tutarlar = f.getAll("odeme_tutar").map(String);
   const taksitler = f.getAll("odeme_taksit").map(String);
   const aciklamalar = f.getAll("odeme_aciklama").map(String);
+  const vadeler = f.getAll("odeme_vade").map(String);
   const odemeler: OdemeSatiri[] = [];
   yontemler.forEach((y, i) => {
     const tutarHam = (tutarlar[i] ?? "").trim();
@@ -68,7 +72,12 @@ export function odemeSatirlari(f: FormData, h: Hatalar): OdemeSatiri[] {
     }
     const yontem = YONTEMLER.find((x) => x === y) ?? "DIGER";
     const taksit = Number(taksitler[i]);
-    odemeler.push({ yontem, tutar, taksit: yontem === "KART" && taksit > 1 ? taksit : null, aciklama });
+    let vade: Date | null = null;
+    if (yontem === "SENET" || yontem === "CEK") {
+      vade = /^\d{4}-\d{2}-\d{2}$/.test(vadeler[i] ?? "") ? new Date(`${vadeler[i]}T00:00:00Z`) : null;
+      if (!vade) h.odemeler = `${i + 1}. ödeme satırında ${yontem === "SENET" ? "senet" : "çek"} vadesi girilmeli.`;
+    }
+    odemeler.push({ yontem, tutar, taksit: yontem === "KART" && taksit > 1 ? taksit : null, vade, aciklama });
   });
   return odemeler;
 }

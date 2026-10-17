@@ -2,13 +2,12 @@
 import { sifirlamadan } from "@/components/form";
 import { useActionState, useMemo, useRef, useState } from "react";
 import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/components/ui";
-import { ODEME_AD } from "@/lib/bicim";
+import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { sayi } from "@/lib/normalize";
 import { vergiKirilimi } from "@/lib/satis/hesap";
 import { musteriBul, satisKaydet } from "./eylem";
 
 type Arac = { id: number; etiket: string; kdv: number | null; otv: number | null };
-type Odeme = { anahtar: number; yontem: string; tutar: string; taksit: string; aciklama: string };
 
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const yuzde = (o: number) => `%${(o * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
@@ -21,7 +20,7 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
   const [kdv, setKdv] = useState(String(ilk?.kdv ?? 0.2));
   const [otv, setOtv] = useState(ilk?.otv !== null && ilk?.otv !== undefined ? String(ilk.otv) : "");
   const [toplam, setToplam] = useState("");
-  const [odemeler, setOdemeler] = useState<Odeme[]>([{ anahtar: 1, yontem: "HAVALE", tutar: "", taksit: "", aciklama: "" }]);
+  const [odemeler, setOdemeler] = useState<Odeme[]>([yeniOdeme("HAVALE")]);
   const [bulMesaj, setBulMesaj] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -117,21 +116,9 @@ export function SatisFormu({ araclar, secili, otvOranlari }: { araclar: Arac[]; 
       </Kart>
 
       <Kart baslik="Ödemeler" sag={<span className={`text-sm ${genel && Math.abs(genel - odemeToplam) >= 0.5 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(genel)}</span>}>
-        <div className="space-y-2">
-          {odemeler.map((o) => (
-            <div key={o.anahtar} className="grid gap-2 md:grid-cols-[10rem_10rem_6rem_1fr_auto]">
-              <Secim name="odeme_yontem" value={o.yontem} onChange={(e) => odemeGuncelle(o.anahtar, "yontem", e.target.value)}>
-                {Object.entries(ODEME_AD).map(([k, ad]) => <option key={k} value={k}>{ad}</option>)}
-              </Secim>
-              <Girdi name="odeme_tutar" inputMode="decimal" placeholder="Tutar" value={o.tutar} onChange={(e) => odemeGuncelle(o.anahtar, "tutar", e.target.value)} />
-              <Girdi name="odeme_taksit" inputMode="numeric" placeholder="Taksit" readOnly={o.yontem !== "KART"} value={o.yontem === "KART" ? o.taksit : ""} onChange={(e) => odemeGuncelle(o.anahtar, "taksit", e.target.value)} />
-              <Girdi name="odeme_aciklama" placeholder="Açıklama (banka, senet no...)" value={o.aciklama} onChange={(e) => odemeGuncelle(o.anahtar, "aciklama", e.target.value)} />
-              <Buton type="button" tur="ikincil" onClick={() => setOdemeler((l) => l.filter((x) => x.anahtar !== o.anahtar))} disabled={odemeler.length === 1}>Sil</Buton>
-            </div>
-          ))}
-        </div>
+        <OdemeSatirlari odemeler={odemeler} guncelle={odemeGuncelle} sil={(a) => setOdemeler((l) => l.filter((x) => x.anahtar !== a))} />
         {h.odemeler && <p className="mt-2 text-xs text-red-600">{h.odemeler}</p>}
-        <Buton type="button" tur="ikincil" className="mt-3" onClick={() => setOdemeler((l) => [...l, { anahtar: Date.now(), yontem: "KART", tutar: "", taksit: "", aciklama: "" }])}>
+        <Buton type="button" tur="ikincil" className="mt-3" onClick={() => setOdemeler((l) => [...l, yeniOdeme()])}>
           Ödeme satırı ekle
         </Buton>
       </Kart>

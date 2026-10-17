@@ -2,13 +2,12 @@
 import { useActionState, useState } from "react";
 import { sifirlamadan } from "@/components/form";
 import { Alan, Buton, Girdi, HataKutusu, Kart, Secim } from "@/components/ui";
-import { ODEME_AD } from "@/lib/bicim";
+import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { sayi } from "@/lib/normalize";
 import { kalemHesapla } from "@/lib/satis/hesap";
 import { hizliSatisKaydet } from "./eylem";
 
 type Kalem = { anahtar: number; aciklama: string; miktar: string; fiyat: string; kdv: string };
-type Odeme = { anahtar: number; yontem: string; tutar: string; taksit: string; aciklama: string };
 
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const KDV = ["0.2", "0.1", "0.01", "0"];
@@ -18,7 +17,7 @@ export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number
   const [durum, gonder, bekliyor] = useActionState(hizliSatisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const [kalemler, setKalemler] = useState<Kalem[]>([bosKalem()]);
-  const [odemeler, setOdemeler] = useState<Odeme[]>([{ anahtar: 1, yontem: "KART", tutar: "", taksit: "", aciklama: "" }]);
+  const [odemeler, setOdemeler] = useState<Odeme[]>([yeniOdeme("KART")]);
   const [tutarElle, setTutarElle] = useState(false);
 
   const hesap = kalemHesapla(
@@ -69,19 +68,7 @@ export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number
       </Kart>
 
       <Kart baslik="Ödeme" sag={<span className={`text-sm ${Math.abs(hesap.genelToplam - odemeToplam) >= 0.01 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(hesap.genelToplam)}</span>}>
-        <div className="space-y-2">
-          {odemeListesi.map((o) => (
-            <div key={o.anahtar} className="grid gap-2 md:grid-cols-[10rem_10rem_6rem_1fr_auto]">
-              <Secim name="odeme_yontem" value={o.yontem} onChange={(e) => odemeGuncelle(o.anahtar, "yontem", e.target.value)}>
-                {Object.entries(ODEME_AD).map(([kod, ad]) => <option key={kod} value={kod}>{ad}</option>)}
-              </Secim>
-              <Girdi name="odeme_tutar" inputMode="decimal" placeholder="Tutar" value={o.tutar} onChange={(e) => odemeGuncelle(o.anahtar, "tutar", e.target.value)} />
-              <Girdi name="odeme_taksit" inputMode="numeric" placeholder="Taksit" readOnly={o.yontem !== "KART"} value={o.yontem === "KART" ? o.taksit : ""} onChange={(e) => odemeGuncelle(o.anahtar, "taksit", e.target.value)} />
-              <Girdi name="odeme_aciklama" placeholder="Banka / POS, provizyon no" value={o.aciklama} onChange={(e) => odemeGuncelle(o.anahtar, "aciklama", e.target.value)} />
-              <Buton type="button" tur="ikincil" onClick={() => setOdemeler(odemeListesi.filter((x) => x.anahtar !== o.anahtar))} disabled={odemeListesi.length === 1}>Sil</Buton>
-            </div>
-          ))}
-        </div>
+        <OdemeSatirlari odemeler={odemeListesi} guncelle={odemeGuncelle} sil={(a) => setOdemeler(odemeListesi.filter((x) => x.anahtar !== a))} />
         {h.odemeler && <p className="mt-2 text-xs text-red-600">{h.odemeler}</p>}
         <Buton
           type="button"
@@ -89,7 +76,7 @@ export function HizliSatisFormu({ firmalar, oneriler }: { firmalar: { id: number
           className="mt-3"
           onClick={() => {
             setTutarElle(true);
-            setOdemeler([...odemeListesi, { anahtar: Date.now(), yontem: "NAKIT", tutar: "", taksit: "", aciklama: "" }]);
+            setOdemeler([...odemeListesi, yeniOdeme("NAKIT")]);
           }}
         >
           Ödemeyi böl

@@ -23,7 +23,8 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
     belgeAyarlari(),
   ]);
   const yapilan = (s.teslimKontrol?.maddeler ?? []) as { ad: string; tamam: boolean }[];
-  const tahsil = s.tahsilatlar.reduce((t, x) => t + Number(x.tutar), 0);
+  const tahsil = s.tahsilatlar.filter((x) => !x.iptalZamani).reduce((t, x) => t + Number(x.tutar), 0);
+  const kalan = Math.round((Number(s.genelToplam) - tahsil) * 100) / 100;
   const maliyet = s.kalemler.reduce((t, x) => t + (x.arac?.maliyetler.reduce((a, m) => a + Number(m.tutar), 0) ?? 0), 0);
   const kayitli = s.durum === "KAYITLI";
   return (
@@ -77,12 +78,19 @@ export default async function SatisDetay({ params }: { params: Promise<{ id: str
         ))}
       </Tablo>
 
-      <h2 className="mb-2 mt-6 text-sm font-semibold">Ödemeler · {tl(tahsil)} / {tl(s.genelToplam)}</h2>
-      <Tablo basliklar={["Tarih", "Yöntem", "Tutar", "Taksit", "Açıklama", "Kaydeden"]} bos={!s.tahsilatlar.length}>
+      <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">
+          Ödemeler · {tl(tahsil)} / {tl(s.genelToplam)}
+          {s.durum !== "IPTAL" && kalan >= 0.01 && <span className="ml-2 text-amber-700">kalan {tl(kalan)}</span>}
+        </h2>
+        {s.durum !== "IPTAL" && k.rol !== "DEPO" && <Link href={`/tahsilat/yeni?satis=${s.id}`} className="text-sm text-zinc-600 hover:underline">Tahsilat ekle</Link>}
+      </div>
+      <Tablo basliklar={["Tarih", "Yöntem", "Tutar", "Taksit / vade", "Açıklama", "Kaydeden", ""]} bos={!s.tahsilatlar.length}>
         {s.tahsilatlar.map((t) => (
-          <tr key={t.id}>
+          <tr key={t.id} className={t.iptalZamani ? "text-zinc-400 line-through" : ""}>
             <Hucre>{tarih(t.tarih)}</Hucre><Hucre>{ODEME_AD[t.yontem]}</Hucre><Hucre>{tl(t.tutar)}</Hucre>
-            <Hucre>{t.taksit ?? "-"}</Hucre><Hucre>{t.aciklama ?? "-"}</Hucre><Hucre>{t.kaydeden ?? "-"}</Hucre>
+            <Hucre>{t.taksit ? `${t.taksit} taksit` : t.vade ? `vade ${tarih(t.vade)}` : "-"}</Hucre><Hucre>{t.aciklama ?? "-"}</Hucre><Hucre>{t.kaydeden ?? "-"}</Hucre>
+            <Hucre>{t.iptalZamani ? <span className="text-xs">İptal: {t.iptalNedeni}</span> : <Link href={`/yazdir/makbuz?id=${t.id}`} target="_blank" className="text-xs text-zinc-600 hover:underline">Makbuz</Link>}</Hucre>
           </tr>
         ))}
       </Tablo>

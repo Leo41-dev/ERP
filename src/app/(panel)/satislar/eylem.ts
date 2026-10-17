@@ -103,7 +103,7 @@ async function satisOlustur(k: OturumKullanici, m: ReturnType<typeof cariDogrula
     await tx.cariHareket.create({ data: { cariId, tarih: s.tarih, borc: dec(v.genelToplam), aciklama: `Satış ${s.formNo}`, satisId: s.id } });
     for (const o of v.odemeler) {
       const t = await tx.tahsilat.create({
-        data: { cariId, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, aciklama: o.aciklama, kaydeden: k.adSoyad },
+        data: { cariId, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: o.aciklama, kaydeden: k.adSoyad },
       });
       await tx.cariHareket.create({ data: { cariId, tarih: t.tarih, alacak: dec(o.tutar), aciklama: `Tahsilat (satış ${s.formNo})`, satisId: s.id, tahsilatId: t.id } });
     }

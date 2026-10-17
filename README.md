@@ -38,4 +38,5 @@ npm run dev
 - **QR etiket:** 58×40 / 40×58 mm etiket; QR aracın ERP sayfasını açar.
 - **Satış:** araç rezerve edilir, ÖTV oranı elle seçilir, fatura tutarı elle girilir ve vergi kırılımı ondan hesaplanır; ödeme satırları, PDI, fatura no işleme, iptal (kayıt silinmez). Satış formu ve PDI yazdırılır.
 - **Hızlı satış:** araç dışı satışlar (parça, aksesuar, ekipman, hizmet) için tek ekranda kalem, kartla/bölünmüş ödeme ve 80 mm ya da A5 satış fişi. Müşteri isteğe bağlı; boşsa perakende müşteri.
+- **Tahsilat ve cari:** satıştan veya müşteriden tahsilat (kapora dahil), senet/çek vade portföyü, yazıyla tutarlı makbuz, ters kayıtla tahsilat iptali, yürüyen bakiyeli cari ekstre ve yazdırma.
 - **Ayarlar:** kullanıcılar, firma bilgileri, konumlar, ÖTV oranları, PDI maddeleri, araç tipleri, marka ve modeller. Tanımlar silinmez, pasif yapılır.

@@ -22,8 +22,8 @@ describe("vergiKirilimi", () => {
 describe("odemeFarki", () => {
   it("ödeme toplamı ile satış tutarı farkını verir", () => {
     const o = odemeFarki(1_000_000, [
-      { yontem: "HAVALE", tutar: 600_000, taksit: null, aciklama: null },
-      { yontem: "KART", tutar: 350_000, taksit: 6, aciklama: null },
+      { yontem: "HAVALE", tutar: 600_000, taksit: null, vade: null, aciklama: null },
+      { yontem: "KART", tutar: 350_000, taksit: 6, vade: null, aciklama: null },
     ]);
     expect(o).toEqual({ toplam: 950_000, fark: 50_000 });
   });

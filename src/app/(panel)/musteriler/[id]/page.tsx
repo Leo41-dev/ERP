@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
 import { SATIS_DURUM_AD, tarih, telefonGoster, tl } from "@/lib/bicim";
+import { cariEkstre } from "@/lib/cari";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 
 export default async function MusteriDetay({ params }: { params: Promise<{ id: string }> }) {
-  await yetkiIste();
+  const k = await yetkiIste();
   const id = Number((await params).id);
   const c = Number.isInteger(id)
     ? await db.cari.findUnique({
@@ -18,6 +19,9 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
       })
     : null;
   if (!c) notFound();
+  const ekstre = await cariEkstre(c.id);
+  const bakiye = ekstre.kapanis;
+  const tahsilatYetki = k.rol !== "DEPO";
   const bilgi: [string, string][] = [
     ["TCKN / VKN", c.tckn ?? c.vkn ?? "-"],
     ["Vergi dairesi", c.vergiDairesi ?? "-"],
@@ -29,7 +33,23 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
   ];
   return (
     <>
-      <SayfaBaslik baslik={c.unvan} aciklama={`Müşteri no ${c.id}`} sag={<BaglantiButon href={`/musteriler/${c.id}/duzenle`}>Düzenle</BaglantiButon>} />
+      <SayfaBaslik baslik={c.unvan} aciklama={`Müşteri no ${c.id}`} sag={
+          <div className="flex gap-2">
+            {tahsilatYetki && <BaglantiButon href={`/tahsilat/yeni?cari=${c.id}`}>Tahsilat al</BaglantiButon>}
+            <BaglantiButon href={`/musteriler/${c.id}/duzenle`} className="!bg-white !text-zinc-800 border border-zinc-300 hover:!bg-zinc-50">Düzenle</BaglantiButon>
+          </div>
+        }
+      />
+      <div className="mb-4 grid grid-cols-3 gap-3">
+        <Kart><p className="text-xs text-zinc-500">Toplam borç</p><p className="mt-1 text-lg font-semibold">{tl(ekstre.satirlar.reduce((t, x) => t + x.borc, 0))}</p></Kart>
+        <Kart><p className="text-xs text-zinc-500">Toplam ödeme</p><p className="mt-1 text-lg font-semibold">{tl(ekstre.satirlar.reduce((t, x) => t + x.alacak, 0))}</p></Kart>
+        <Kart>
+          <p className="text-xs text-zinc-500">Bakiye</p>
+          <p className={`mt-1 text-lg font-semibold ${bakiye > 0.004 ? "text-red-600" : bakiye < -0.004 ? "text-green-700" : ""}`}>
+            {tl(Math.abs(bakiye))} {bakiye > 0.004 ? "borçlu" : bakiye < -0.004 ? "alacaklı" : ""}
+          </p>
+        </Kart>
+      </div>
       <Kart baslik="Bilgiler">
         <dl className="grid gap-x-6 gap-y-3 text-sm md:grid-cols-2">
           {bilgi.map(([k, v]) => (
@@ -48,6 +68,22 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
             <Hucre>{tl(s.genelToplam)}</Hucre>
             <Hucre><Etiket renk={s.durum === "IPTAL" ? "kirmizi" : s.durum === "FATURALANDI" ? "yesil" : "sari"}>{SATIS_DURUM_AD[s.durum]}</Etiket></Hucre>
             <Hucre>{s.satici?.adSoyad ?? "-"}</Hucre>
+          </tr>
+        ))}
+      </Tablo>
+
+      <div className="mb-2 mt-6 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Cari ekstre</h2>
+        <Link href={`/yazdir/ekstre/${c.id}`} target="_blank" className="text-sm text-zinc-600 hover:underline">Ekstreyi yazdır</Link>
+      </div>
+      <Tablo basliklar={["Tarih", "Açıklama", "Borç", "Alacak", "Bakiye"]} bos={!ekstre.satirlar.length}>
+        {[...ekstre.satirlar].reverse().map((h) => (
+          <tr key={h.id}>
+            <Hucre>{tarih(h.tarih)}</Hucre>
+            <Hucre>{h.satis ? <Link href={`/satislar/${h.satis.id}`} className="hover:underline">{h.aciklama}</Link> : h.aciklama}</Hucre>
+            <Hucre>{h.borc ? tl(h.borc) : ""}</Hucre>
+            <Hucre>{h.alacak ? tl(h.alacak) : ""}</Hucre>
+            <Hucre>{tl(h.bakiye)}</Hucre>
           </tr>
         ))}
       </Tablo>
