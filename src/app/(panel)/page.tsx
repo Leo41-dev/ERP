@@ -110,12 +110,12 @@ export default async function Pano({ searchParams }: { searchParams: Promise<{ d
           </Kart>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Kart baslik="Bu ayın hedefleri" sag={<span className="text-xs text-zinc-500">Kayıtlı hedef yoksa son 3 tam ay × 1,10</span>}>
+            <Kart baslik="Bu ayın hedefleri" sag={k.rol === "YONETICI" ? <Link href="/ayarlar/hedefler" className="text-xs text-zinc-600 hover:underline">Hedefleri düzenle</Link> : <span className="text-xs text-zinc-500">Kayıtlı hedef yoksa son 3 tam ay × 1,10</span>}>
               {v.hedefler.length ? (
                 <div className="space-y-3">
                   {v.hedefler.map((h) => (
                     <div key={h.id} className="text-sm">
-                      <div className="flex justify-between"><span className="font-medium">{h.ad}</span><span className="tabular-nums text-zinc-600">{h.adet} / {h.hedefAdet} araç · {kisa(h.ciro)} / {kisa(h.hedefCiro)}</span></div>
+                      <div className="flex justify-between"><span className="font-medium">{h.ad}{!h.kayitli && <span className="ml-1 text-xs font-normal text-zinc-500">(öneri)</span>}</span><span className="tabular-nums text-zinc-600">{h.adet} / {h.hedefAdet} araç · {kisa(h.ciro)} / {kisa(h.hedefCiro)}</span></div>
                       <div className="mt-1 grid grid-cols-2 gap-2"><Ilerleme oran={h.adet / h.hedefAdet} /><Ilerleme oran={h.hedefCiro ? h.ciro / h.hedefCiro : 0} /></div>
                     </div>
                   ))}

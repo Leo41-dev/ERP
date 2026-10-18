@@ -39,7 +39,7 @@ export default async function Ayarlar() {
     <>
       <SayfaBaslik baslik="Ayarlar" aciklama="Tanımlar silinmez, pasif yapılır; eski kayıtlar bozulmaz." />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Kart baslik="Kullanıcılar" sag={<Link href="/ayarlar/kullanicilar" className="text-sm text-zinc-600 hover:underline">Yönet</Link>}>
+        <Kart baslik="Kullanıcılar" sag={<span className="flex gap-4"><Link href="/ayarlar/hedefler" className="text-sm text-zinc-600 hover:underline">Satış hedefleri</Link><Link href="/ayarlar/kullanicilar" className="text-sm text-zinc-600 hover:underline">Yönet</Link></span>}>
           <p className="text-sm text-zinc-600">{kullaniciSayisi} aktif kullanıcı.</p>
         </Kart>
 

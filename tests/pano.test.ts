@@ -34,3 +34,12 @@ describe("gün farkı ve hedef", () => {
     expect(hedefHesapla([]).adet).toBe(1);
   });
 });
+
+describe("ay kaydırma", () => {
+  it("yıl sınırını geçer", async () => {
+    const { ayKaydir, ayBasi } = await import("../src/lib/panoHesap");
+    expect(ayKaydir("2026-01", -3)).toBe("2025-10");
+    expect(ayKaydir("2026-11", 2)).toBe("2027-01");
+    expect(ayBasi("2026-10").toISOString()).toBe("2026-09-30T21:00:00.000Z");
+  });
+});

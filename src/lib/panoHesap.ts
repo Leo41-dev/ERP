@@ -40,3 +40,16 @@ export function hedefHesapla(satislar: { arac: boolean; tutar: number }[]) {
   const ciro = satislar.reduce((t, s) => t + s.tutar, 0);
   return { adet: Math.max(1, Math.round((adet / 3) * HEDEF_BUYUME)), ciro: Math.round(((ciro / 3) * HEDEF_BUYUME) / 1000) * 1000 };
 }
+
+/** "yyyy-MM" ayını n ay kaydırır */
+export function ayKaydir(ay: string, n: number) {
+  const [y, m] = ay.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** Ayın Türkiye saatine göre başlangıç anı */
+export const ayBasi = (ay: string) => new Date(Date.parse(`${ay}-01T00:00:00Z`) - SAAT3);
+
+/** Türkiye saatine göre içinde bulunulan ay */
+export const buAy = (simdi = new Date()) => trKunye(simdi).toISOString().slice(0, 7);
