@@ -11,6 +11,7 @@ export default async function PanelDuzeni({ children }: { children: ReactNode })
     { href: "/satislar", ad: "Satışlar" },
     ...(k.rol !== "DEPO" ? [{ href: "/satislar/hizli", ad: "Hızlı satış" }, { href: "/teklifler", ad: "Teklifler" }] : []),
     ...(k.rol !== "DEPO" ? [{ href: "/tahsilat", ad: "Tahsilat" }] : []),
+    ...(k.rol === "YONETICI" || k.rol === "MUHASEBE" ? [{ href: "/analiz", ad: "Analiz" }] : []),
     { href: "/araclar", ad: "Araçlar" },
     { href: "/musteriler", ad: "Müşteriler" },
     ...(k.rol === "YONETICI" ? [{ href: "/ayarlar", ad: "Ayarlar" }] : []),
