@@ -31,6 +31,7 @@ export function medyan(l: number[]) {
   const o = Math.floor(s.length / 2);
   return s.length % 2 ? s[o] : (s[o - 1] + s[o]) / 2;
 }
+const yuzde = (v: number | null) => (v === null ? "-" : `%${v.toLocaleString("tr-TR", { maximumFractionDigits: 1 })}`);
 const ort = (l: number[]) => (l.length ? l.reduce((t, x) => t + x, 0) / l.length : null);
 const grupla = <T,>(l: T[], f: (x: T) => string) => { const m = new Map<string, T[]>(); for (const x of l) m.set(f(x), [...(m.get(f(x)) ?? []), x]); return m; };
 
@@ -67,7 +68,7 @@ export function analizHesapla(araclar: AracVeri[], teklifler: TeklifVeri[], o: {
   const sure = SURE_KOVALARI.map(() => 0);
   for (const x of satilan) sure[gunKova(SURE_KOVALARI, x.sure)]++;
   tablolar.push({
-    anahtar: "satis-suresi", baslik: "Satış süresi", aciklama: `Dönemde satılan araçların stokta kaldığı süre. Medyan ${medyan(satilan.map((x) => x.sure)) ?? "-"} gün.`,
+    anahtar: "satis-suresi", baslik: "Satış süresi", aciklama: `Dönemde satılan araçların stokta kaldığı süre. Medyan ${medyan(satilan.map((x) => x.sure))?.toLocaleString("tr-TR") ?? "-"} gün.`,
     kolonlar: [{ ad: "Süre", tur: "metin" }, { ad: "Araç", tur: "adet" }, { ad: "Pay", tur: "yuzde" }],
     satirlar: SURE_KOVALARI.map(([, , ad], i) => [ad, sure[i], satilan.length ? (sure[i] / satilan.length) * 100 : 0]),
     cubuk: 1,
@@ -85,7 +86,7 @@ export function analizHesapla(araclar: AracVeri[], teklifler: TeklifVeri[], o: {
   for (const x of maliyetli) { const k = marj[aralikKova(MARJ_KOVALARI, x.marj!)]; k.adet++; k.kar += x.kar!; }
   tablolar.push({
     anahtar: "marj", baslik: "Kârlılık dağılımı", maliyetli: true,
-    aciklama: `Maliyeti girilmiş ${maliyetli.length} satış. Ortalama ${ort(maliyetli.map((x) => x.marj!))?.toFixed(1) ?? "-"}%, medyan ${medyan(maliyetli.map((x) => x.marj!))?.toFixed(1) ?? "-"}%.`,
+    aciklama: `Maliyeti girilmiş ${maliyetli.length} satış. Ortalama ${yuzde(ort(maliyetli.map((x) => x.marj!)))}, medyan ${yuzde(medyan(maliyetli.map((x) => x.marj!)))}.`,
     kolonlar: [{ ad: "Kârlılık", tur: "metin" }, { ad: "Satış", tur: "adet" }, { ad: "Toplam kâr", tur: "tl" }],
     satirlar: MARJ_KOVALARI.map(([, , ad], i) => [ad, marj[i].adet, marj[i].kar]),
     cubuk: 1,
