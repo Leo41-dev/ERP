@@ -19,6 +19,16 @@ npm run db:seed               # konumlar, ÖTV oranları, PDI listesi ve ilk yö
 npm run dev
 ```
 
+### Örnek verili deneme kurulumu
+
+Boş bir veritabanında `npm run demo` şemayı uygular ve örnek veriyi yükler (46 araç, 96 satış, teklifler, tahsilatlar). Giriş: `leo` / `deneme1234` (yönetici), `ali` / `satis12345` (satış). Dolu veritabanına dokunmaz.
+
+```bash
+npm install
+npm run demo
+npm run build && npm start      # http://localhost:3000
+```
+
 ## Komutlar
 
 | Komut | Ne yapar |

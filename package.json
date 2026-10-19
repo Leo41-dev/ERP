@@ -10,7 +10,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "postinstall": "prisma generate",
+    "demo": "prisma migrate deploy && tsx prisma/demo.ts --demo"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
