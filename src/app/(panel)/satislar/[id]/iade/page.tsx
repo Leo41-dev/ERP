@@ -12,7 +12,7 @@ export default async function IadeAl({ params }: { params: Promise<{ id: string 
   const s = Number.isInteger(id)
     ? await db.satis.findUnique({
         where: { id },
-        include: { cari: true, kalemler: { orderBy: { id: "asc" }, include: { iadeler: true, arac: true } }, iadeler: { include: { geriOdemeler: true } }, tahsilatlar: true },
+        include: { cari: true, kalemler: { orderBy: { id: "asc" }, include: { iadeler: true, arac: true, urun: { select: { tur: true } } } }, iadeler: { include: { geriOdemeler: true } }, tahsilatlar: true },
       })
     : null;
   if (!s || (k.rol === "SATIS" && s.saticiId !== k.id)) notFound();
@@ -34,6 +34,7 @@ export default async function IadeAl({ params }: { params: Promise<{ id: string 
             id: x.id,
             aciklama: x.arac ? `${x.aciklama} · ${x.arac.sase}` : x.aciklama,
             arac: !!x.aracId,
+            stoklu: !!x.urunId && x.urun?.tur !== "HIZMET",
             miktar,
             kalan: Math.round((miktar - x.iadeler.reduce((a, i) => a + Number(i.miktar), 0)) * 1000) / 1000,
             birim: Number(x.tutar) / miktar,

@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "postinstall": "prisma generate",
-    "demo": "prisma migrate deploy && tsx prisma/demo.ts --demo"
+    "demo": "prisma migrate deploy && tsx prisma/demo.ts --demo && tsx prisma/demoStok.ts",
+    "demo:stok": "tsx prisma/demoStok.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

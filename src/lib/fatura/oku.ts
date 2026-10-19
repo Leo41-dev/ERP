@@ -38,10 +38,10 @@ export type FaturaSonuc =
       uyarilar: string[];
     };
 
-type Dugum = Record<string, unknown>;
+export type Dugum = Record<string, unknown>;
 
-const LISTELER = new Set(["InvoiceLine", "Note", "AdditionalItemProperty", "SerialID", "TaxSubtotal", "ItemInstance", "PartyIdentification", "TaxTotal"]);
-const ayristirici = new XMLParser({
+const LISTELER = new Set(["AllowanceCharge", "InvoiceLine", "Note", "AdditionalItemProperty", "SerialID", "TaxSubtotal", "ItemInstance", "PartyIdentification", "TaxTotal"]);
+export const ayristirici = new XMLParser({
   removeNSPrefix: true,
   ignoreAttributes: false,
   attributeNamePrefix: "@",
@@ -50,14 +50,14 @@ const ayristirici = new XMLParser({
   isArray: (ad) => LISTELER.has(ad),
 });
 
-const liste = (x: unknown): unknown[] => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]);
-function yazi(x: unknown): string {
+export const liste = (x: unknown): unknown[] => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]);
+export function yazi(x: unknown): string {
   if (x === undefined || x === null) return "";
   if (typeof x === "object") return yazi((x as Dugum)["#text"]);
   return String(x).trim();
 }
 /** "Party/PartyName/Name" gibi bir yolun ilk değeri */
-function yol(d: unknown, p: string): unknown {
+export function yol(d: unknown, p: string): unknown {
   let cur: unknown = d;
   for (const parca of p.split("/")) {
     const ilk = liste(cur)[0];
@@ -66,8 +66,8 @@ function yol(d: unknown, p: string): unknown {
   }
   return Array.isArray(cur) ? cur[0] : cur;
 }
-const yy = (d: unknown, p: string) => yazi(yol(d, p));
-function sayi(s: string): number | null {
+export const yy = (d: unknown, p: string) => yazi(yol(d, p));
+export function sayi(s: string): number | null {
   if (!s) return null;
   const v = parseFloat(s.replace(",", "."));
   return Number.isNaN(v) ? null : v;
@@ -119,7 +119,7 @@ function ozellikler(item: unknown): Record<string, string> {
 }
 
 /** Satırdaki vergi oranları: 0015 KDV, 0071 ÖTV (1. liste) */
-function vergiOranlari(satir: unknown) {
+export function vergiOranlari(satir: unknown) {
   let kdv: number | null = null;
   let otv: number | null = null;
   for (const tt of liste((satir as Dugum).TaxTotal)) {
@@ -134,7 +134,7 @@ function vergiOranlari(satir: unknown) {
   return { kdv, otv };
 }
 
-function saticiVknBul(kok: Dugum): string {
+export function saticiVknBul(kok: Dugum): string {
   const parti = yol(kok, "AccountingSupplierParty/Party") as Dugum | undefined;
   for (const pi of liste(parti?.PartyIdentification)) {
     const id = (pi as Dugum).ID as Dugum | string | undefined;

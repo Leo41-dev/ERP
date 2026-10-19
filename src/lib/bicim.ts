@@ -31,6 +31,10 @@ export const KONDISYON_AD: Record<string, string> = { SIFIR: "Sıfır", IKINCI_E
 export const ARAC_DURUM_AD: Record<string, string> = { STOKTA: "Stokta", REZERVE: "Rezerve", SATILDI: "Satıldı", IADE: "İade" };
 export const SATIS_DURUM_AD: Record<string, string> = { TASLAK: "Taslak", KAYITLI: "Kayıtlı", FATURALANDI: "Faturalandı", IPTAL: "İptal", IADE: "İade edildi" };
 export const ODEME_AD: Record<string, string> = { HAVALE: "Havale/EFT", KART: "Kredi kartı", NAKIT: "Nakit", SENET: "Senet", CEK: "Çek", DIGER: "Diğer" };
+export const URUN_TUR_AD: Record<string, string> = { YEDEK_PARCA: "Yedek parça", AKSESUAR: "Aksesuar", HIZMET: "Hizmet", DIGER: "Diğer", ARAC: "Araç" };
+export const STOK_HAREKET_AD: Record<string, string> = { ACILIS: "Açılış", ALIS: "Giriş", SATIS: "Satış", IADE: "İade", SAYIM: "Sayım farkı", CIKIS: "Çıkış", IPTAL: "Satış iptali" };
+/** 1,5 · 12 · 0,125 gibi miktar yazımı */
+export const miktar = (v: Sayisal) => Number(v ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 3 });
 export const TESCIL_AD: Record<string, string> = { TESCILSIZ: "Tescilsiz", BASVURUDA: "Başvuruda", TESCILLI: "Tescilli" };
 export const SATIS_DURUM_RENK = { TASLAK: "gri", KAYITLI: "sari", FATURALANDI: "yesil", IPTAL: "kirmizi", IADE: "gri" } as const;
 

@@ -7,6 +7,7 @@ import { cariDogrula, formNesne, type Hatalar } from "@/lib/dogrulama/cari";
 import { satisDogrula } from "@/lib/dogrulama/satis";
 import { yetkiIste, type OturumKullanici } from "@/lib/oturum";
 import { odemeFarki, vergiKirilimi } from "@/lib/satis/hesap";
+import { satisStoguGeriAl } from "@/lib/stok";
 
 export type SatisDurum = { hatalar?: Hatalar; genel?: string; uyari?: string; onayIste?: boolean } | undefined;
 
@@ -138,6 +139,7 @@ export async function satisIptal(id: number, _: SatisDurum, form: FormData): Pro
     await tx.satis.update({ where: { id }, data: { durum: "IPTAL", iptalNedeni: neden, iptalEden: k.adSoyad, iptalZamani: new Date() } });
     const aracIdler = s.kalemler.map((x) => x.aracId).filter((x): x is number => x !== null);
     await tx.arac.updateMany({ where: { id: { in: aracIdler }, durum: "REZERVE" }, data: { durum: "STOKTA" } });
+    await satisStoguGeriAl(tx, id, k.adSoyad);
     // cari hareketleri silinmez; ters kayıtla kapatılır
     const hareketler = await tx.cariHareket.findMany({ where: { satisId: id } });
     const borc = hareketler.reduce((t, h) => t + Number(h.borc), 0);
@@ -146,6 +148,7 @@ export async function satisIptal(id: number, _: SatisDurum, form: FormData): Pro
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "IPTAL", tablo: "Satis", kayitId: String(id), detay: { neden } } });
   });
   revalidatePath(`/satislar/${id}`);
+  revalidatePath("/stok");
   return undefined;
 }
 

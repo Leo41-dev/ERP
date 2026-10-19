@@ -11,7 +11,7 @@ export function IptalFormu({ eylem }: { eylem: Eylem }) {
     <form action={gonder} className="space-y-2">
       <HataKutusu mesaj={d?.genel} />
       <Alan etiket="İptal nedeni"><Girdi name="neden" required /></Alan>
-      <Buton tur="tehlike" disabled={bekliyor} onClick={(e) => { if (!confirm("Satış iptal edilsin mi? Araç stoğa döner.")) e.preventDefault(); }}>Satışı iptal et</Buton>
+      <Buton tur="tehlike" disabled={bekliyor} onClick={(e) => { if (!confirm("Satış iptal edilsin mi? Araç ve ürünler stoğa döner.")) e.preventDefault(); }}>Satışı iptal et</Buton>
     </form>
   );
 }

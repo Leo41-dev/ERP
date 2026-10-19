@@ -8,6 +8,7 @@ import { odemeSatirlari } from "@/lib/dogrulama/satis";
 import { para, sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
 import { iadeKalemleri, satisKalani } from "@/lib/satis/iade";
+import { stokHareketYaz } from "@/lib/stok";
 
 export type IadeDurumu = { hatalar?: Hatalar; genel?: string } | undefined;
 
@@ -17,7 +18,7 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
   const k = await yetkiIste("SATIS", "MUHASEBE");
   const s = await db.satis.findUnique({
     where: { id: satisId },
-    include: { kalemler: { include: { iadeler: true } }, iadeler: { include: { geriOdemeler: true } }, tahsilatlar: true },
+    include: { kalemler: { include: { iadeler: true, urun: { select: { tur: true } } } }, iadeler: { include: { geriOdemeler: true } }, tahsilatlar: true },
   });
   if (!s) return { genel: "Satış bulunamadı." };
   if (k.rol === "SATIS" && s.saticiId !== k.id) return { genel: "Bu satış üzerinde yetkiniz yok." };
@@ -74,6 +75,16 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
     if (aracIdler.length) {
       await tx.arac.updateMany({ where: { id: { in: aracIdler }, durum: { in: ["SATILDI", "REZERVE"] } }, data: { durum: "STOKTA", ...(ikinciEl ? { kondisyon: "IKINCI_EL" } : {}) } });
     }
+    // stok kartlı kalemler satıştaki maliyetle stoğa döner; kusurlu ürün için bu adım kapatılabilir
+    if (form.get("stogaAl") === "on") {
+      const cikislar = await tx.stokHareketi.findMany({ where: { satisId, tur: "SATIS" }, select: { satisKalemiId: true, birimMaliyet: true } });
+      for (const x of kalem.satirlar) {
+        const sk = s.kalemler.find((y) => y.id === x.satisKalemiId);
+        if (!sk?.urunId || sk.urun?.tur === "HIZMET") continue;
+        const c = cikislar.find((y) => y.satisKalemiId === sk.id);
+        await stokHareketYaz(tx, { urunId: sk.urunId, tur: "IADE", miktar: x.miktar, birimMaliyet: c?.birimMaliyet ? Number(c.birimMaliyet) : null, satisId, satisKalemiId: sk.id, iadeId: iade.id, kaydeden: k.adSoyad });
+      }
+    }
     if (kalem.tamami) await tx.satis.update({ where: { id: satisId }, data: { durum: "IADE" } });
     await tx.denetimKaydi.create({
       data: { kullanici: k.kullaniciAdi, islem: "IADE", tablo: "Satis", kayitId: String(satisId), detay: { iadeNo: iade.iadeNo, tutar, neden, geriOdeme: geriToplam, kalan: satisKalani({ genelToplam: Number(s.genelToplam), iade: s.iadeler.reduce((a, i) => a + Number(i.tutar), 0) + tutar, tahsil, geriOdeme: oncekiGeri + geriToplam }) } },
@@ -83,5 +94,6 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
   revalidatePath(`/satislar/${satisId}`);
   revalidatePath("/satislar");
   revalidatePath("/araclar");
+  revalidatePath("/stok");
   redirect(`/satislar/${satisId}?iade=${iadeId}`);
 }

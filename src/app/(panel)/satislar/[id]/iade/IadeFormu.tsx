@@ -6,7 +6,7 @@ import { Alan, Buton, Girdi, HataKutusu, Kart } from "@/components/ui";
 import { sayi } from "@/lib/normalize";
 import type { IadeDurumu } from "./eylem";
 
-export type IadeKalem = { id: number; aciklama: string; arac: boolean; miktar: number; kalan: number; birim: number };
+export type IadeKalem = { id: number; aciklama: string; arac: boolean; stoklu: boolean; miktar: number; kalan: number; birim: number };
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const virgul = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
@@ -52,6 +52,11 @@ export function IadeFormu({ eylem, kalemler, alinan, acik, tescilli }: { eylem: 
           ))}
         </div>
         {h.kalemler && <p className="mt-2 text-xs text-red-600">{h.kalemler}</p>}
+        {kalemler.some((k) => k.stoklu && (sayi(secim[k.id]) ?? 0) > 0) && (
+          <label className="mt-4 flex items-center gap-2 text-sm">
+            <input type="checkbox" name="stogaAl" defaultChecked /> İade edilen ürünler satılabilir durumda, stoğa geri alınsın
+          </label>
+        )}
         {aracSecili && (
           <label className="mt-4 flex items-center gap-2 text-sm">
             <input type="checkbox" name="ikinciEl" defaultChecked={tescilli} /> Araç stoğa 2. el olarak dönsün

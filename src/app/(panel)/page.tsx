@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import { Hucre, Kart, SayfaBaslik, Secim, Girdi, Tablo } from "@/components/ui";
 import { KONDISYON_AD, tl } from "@/lib/bicim";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
+import { db } from "@/lib/db";
 import { panoVerisi } from "@/lib/pano";
+import { kritikStoklar } from "@/lib/stok";
 import { DONEM_AD, donemAraligi, trKunye, type Donem } from "@/lib/panoHesap";
 import { Trend } from "./Trend";
 
@@ -41,7 +43,7 @@ export default async function Pano({ searchParams }: { searchParams: Promise<{ d
   const maliyet = maliyetGorur(k);
   const satisRolu = k.rol === "SATIS";
   const satisGorur = k.rol !== "DEPO" && k.rol !== "SERVIS";
-  const v = await panoVerisi({ bas, bit, saticiId: satisRolu ? k.id : undefined, maliyet, oluEsik, dusukMarj: 5 });
+  const [v, parca] = await Promise.all([panoVerisi({ bas, bit, saticiId: satisRolu ? k.id : undefined, maliyet, oluEsik, dusukMarj: 5 }), kritikStoklar(db, 10)]);
   const o = v.ozet;
 
   // grafik: 62 günden kısa dönemde günlük, uzunda aylık sütun
@@ -200,6 +202,25 @@ export default async function Pano({ searchParams }: { searchParams: Promise<{ d
         </Tablo>
       </div>
       {v.olu.length > 15 && <p className="mt-1 text-xs text-zinc-500">En uzun bekleyen 15 araç gösteriliyor.</p>}
+
+      <h2 className="mb-2 mt-6 text-sm font-semibold">Parça ve aksesuar stoğu</h2>
+      <div className="grid gap-4 xl:grid-cols-[1fr_2fr]">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-1">
+          <Gosterge ad="Kritik seviyede" deger={parca.kritik ? <span className="text-amber-700">{sayi(parca.kritik)}</span> : "0"} alt="Kritik seviyeye inen ürün" href="/stok?durum=kritik" />
+          <Gosterge ad="Eksi stokta" deger={parca.eksi ? <span className="text-red-700">{sayi(parca.eksi)}</span> : "0"} alt="Yönetici onayıyla stoksuz satılan" href="/stok?durum=eksi" />
+          {maliyet && <Gosterge ad="Parça stok değeri" deger={kisa(parca.deger)} alt="Ortalama maliyetle" href="/stok" />}
+        </div>
+        <Tablo basliklar={["Sipariş verilecekler", "Kod", "Stokta", "Kritik seviye"]} bos={!parca.liste.length}>
+          {parca.liste.map((x) => (
+            <tr key={x.id}>
+              <Hucre className="max-w-72 truncate"><Link href={`/stok/${x.id}`} className="hover:underline">{x.ad}</Link></Hucre>
+              <Hucre className="font-mono text-xs">{x.kod}</Hucre>
+              <Hucre className={x.miktar < 0 ? "text-red-700" : "text-amber-700"}>{sayi(x.miktar)} {x.birim}</Hucre>
+              <Hucre>{x.kritik === null ? "-" : `${sayi(x.kritik)} ${x.birim}`}</Hucre>
+            </tr>
+          ))}
+        </Tablo>
+      </div>
     </>
   );
 }

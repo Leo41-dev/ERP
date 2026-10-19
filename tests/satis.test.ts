@@ -57,7 +57,7 @@ describe("hizliSatisDogrula", () => {
       ]),
     );
     expect(hatalar).toEqual({});
-    expect(veri.kalemler).toEqual([{ aciklama: "KASK", miktar: 1, birimFiyat: 1500.5, kdvOrani: 0.2 }]);
+    expect(veri.kalemler).toEqual([{ aciklama: "KASK", miktar: 1, birimFiyat: 1500.5, kdvOrani: 0.2, urunId: null }]);
     expect(veri.odemeler.map((o) => [o.yontem, o.tutar, o.taksit])).toEqual([["NAKIT", 500, null], ["KART", 1000.5, 3]]);
   });
   it("kalem yoksa ve telefon girilip ad yoksa hata verir", () => {

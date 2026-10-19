@@ -12,10 +12,8 @@ export default async function HizliSatis({ searchParams }: { searchParams: Promi
   const teklifId = Number(p.teklif) || null;
   // Türkiye saatiyle bugünün başı (UTC+3, yaz saati yok)
   const gunBasi = new Date(Math.floor((Date.now() + 3 * 3_600_000) / 86_400_000) * 86_400_000 - 3 * 3_600_000);
-  const [firmalar, oncekiler, kayit, bugun, t] = await Promise.all([
+  const [firmalar, kayit, bugun, t] = await Promise.all([
     db.firma.findMany({ where: { aktif: true }, orderBy: { id: "asc" }, select: { id: true, unvan: true, varsayilan: true } }),
-    // sık yazılan ürün/hizmet adları öneri olarak gelir
-    db.satisKalemi.findMany({ where: { satis: { tur: "HIZLI" } }, distinct: ["aciklama"], orderBy: { id: "desc" }, take: 300, select: { aciklama: true } }),
     kayitId ? db.satis.findFirst({ where: { id: kayitId, tur: "HIZLI", ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) } }) : null,
     db.satis.findMany({
       where: { tur: "HIZLI", tarih: { gte: gunBasi }, ...(k.rol === "SATIS" ? { saticiId: k.id } : {}) },
@@ -53,7 +51,7 @@ export default async function HizliSatis({ searchParams }: { searchParams: Promi
           </div>
         </Kart>
       )}
-      <HizliSatisFormu key={kayitId ?? teklifId ?? "yeni"} teklif={teklif} firmalar={firmalar} oneriler={oncekiler.map((x) => x.aciklama)} />
+      <HizliSatisFormu key={kayitId ?? teklifId ?? "yeni"} teklif={teklif} firmalar={firmalar} />
 
       <h2 className="mb-2 mt-8 text-sm font-semibold">Bugünkü hızlı satışlar · {tl(gunToplam)}</h2>
       <Tablo basliklar={["No", "Saat", "Kalemler", "Ödeme", "Tutar", ""]} bos={!bugun.length}>

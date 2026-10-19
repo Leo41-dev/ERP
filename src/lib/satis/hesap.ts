@@ -19,7 +19,7 @@ export function odemeFarki(genelToplam: number, odemeler: OdemeSatiri[]) {
   return { toplam, fark: para(genelToplam - toplam) };
 }
 
-export type KalemGirdisi = { aciklama: string; miktar: number; birimFiyat: number; kdvOrani: number }; // birim fiyat KDV dahil
+export type KalemGirdisi = { aciklama: string; miktar: number; birimFiyat: number; kdvOrani: number; urunId?: number | null }; // birim fiyat KDV dahil
 
 /** Hızlı satış kalemleri: KDV dahil birim fiyattan satır tutarı, KDV hariç birim fiyat ve KDV */
 export function kalemHesapla(kalemler: KalemGirdisi[]) {
