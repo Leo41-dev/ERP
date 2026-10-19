@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kartepe ATV ERP",
+  title: "ERP",
   description: "Satış, stok ve teknik servis yönetimi",
 };
 

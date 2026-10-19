@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { uygulamaAdi } from "@/lib/belgeAyarlari";
 import { ROL_AD } from "@/lib/bicim";
 import { yetkiIste } from "@/lib/oturum";
 import { cikisEylemi } from "./eylem";
@@ -21,7 +22,7 @@ export default async function PanelDuzeni({ children }: { children: ReactNode })
     <div className="min-h-screen bg-zinc-50 md:flex">
       <aside className="border-b border-zinc-200 bg-white p-3 md:min-h-screen md:w-56 md:border-b-0 md:border-r">
         <div className="mb-3 flex items-center justify-between md:block">
-          <p className="px-3 text-sm font-semibold">Kartepe ATV</p>
+          <p className="px-3 text-sm font-semibold">{await uygulamaAdi()}</p>
           <div className="px-3 text-xs text-zinc-500 md:mt-1">
             {k.adSoyad} · {ROL_AD[k.rol]}
           </div>

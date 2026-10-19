@@ -3,7 +3,7 @@ import { db } from "./db";
 
 /** Yazdırılan belgelerde Ayarlar'dan değiştirilebilen başlık ve metinler; boş bırakılan alan varsayılana döner. */
 export const BELGE_AYARLARI = {
-  "belge.baslik": { ad: "Belge üst başlığı", varsayilan: "KARTEPE ATV MOTORLU ARAÇLAR", cokSatir: false },
+  "belge.baslik": { ad: "Belge üst başlığı (boşsa varsayılan firmanın unvanı)", varsayilan: "", cokSatir: false },
   "belge.satisFormuBaslik": { ad: "Satış formu başlığı", varsayilan: "CARİ HESAP TANIMLAMA VE SATIŞ FORMU", cokSatir: false },
   "belge.pdiBaslik": { ad: "PDI başlığı", varsayilan: "ARAÇ TESLİM VE SON KONTROL LİSTESİ", cokSatir: false },
   "belge.satisFormuNotu": { ad: "Satış formu alt metni", varsayilan: "", cokSatir: true },
@@ -32,5 +32,12 @@ export async function belgeAyarlari(): Promise<BelgeAyarlari> {
   const kayitlar = await db.ayar.findMany({ where: { anahtar: { startsWith: "belge." } } });
   const sonuc = Object.fromEntries(Object.entries(BELGE_AYARLARI).map(([a, t]) => [a, t.varsayilan])) as BelgeAyarlari;
   for (const k of kayitlar) if (k.anahtar in sonuc && k.deger.trim()) sonuc[k.anahtar as BelgeAyarAnahtari] = k.deger;
+  if (!sonuc["belge.baslik"]) sonuc["belge.baslik"] = (await uygulamaAdi()).toLocaleUpperCase("tr-TR");
   return sonuc;
+}
+
+/** Menüde ve giriş ekranında görünen ad: varsayılan firmanın unvanı; firma tanımlanmadıysa "ERP" */
+export async function uygulamaAdi() {
+  const f = await db.firma.findFirst({ where: { aktif: true }, orderBy: [{ varsayilan: "desc" }, { id: "asc" }], select: { unvan: true } });
+  return f?.unvan ?? "ERP";
 }

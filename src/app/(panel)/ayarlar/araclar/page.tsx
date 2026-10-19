@@ -27,7 +27,7 @@ export default async function AracAyarlari() {
         <Kart baslik="Araç tipleri">
           <Liste ogeler={tipler.map((x) => ({ id: x.id, ad: x.ad, sag: <span className="text-xs text-zinc-500">önerilen ÖTV {yuzde(x.varsayilanOtvOrani)}</span> }))} />
           <AyarFormu eylem={tipEkle}>
-            <Girdi name="ad" placeholder="Tip (ör. ATV, UTV)" className="w-auto flex-1" required />
+            <Girdi name="ad" placeholder="Tip (ör. SUV, ATV)" className="w-auto flex-1" required />
             <Secim name="otv" className="w-auto" defaultValue="">
               <option value="">Önerilen ÖTV yok</option>
               {aktifOtv.map((o) => <option key={o.id} value={String(o.oran)}>{yuzde(o.oran)}</option>)}
