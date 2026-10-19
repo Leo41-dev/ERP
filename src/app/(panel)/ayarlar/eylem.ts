@@ -175,8 +175,46 @@ export async function modelEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   return { tamam: "Eklendi." };
 }
 
-/** Konum, ÖTV oranı ve kontrol maddesi silinmez; pasif yapılır ki eski kayıtlar bozulmasın. */
-export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMaddesi", id: number) {
+/* ---------- ürün grupları ve markaları ---------- */
+
+type UrunTanim = "urunGrubu" | "urunMarkasi";
+const TANIM_AD: Record<UrunTanim, { ad: string; tablo: string }> = { urunGrubu: { ad: "grup", tablo: "UrunGrubu" }, urunMarkasi: { ad: "marka", tablo: "UrunMarkasi" } };
+const tanimAdi = (f: FormData) => yazi(f, "ad").toLocaleUpperCase("tr-TR");
+
+export async function urunTanimEkle(tur: UrunTanim, _: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const ad = tanimAdi(f);
+  if (!ad) return { hata: `${TANIM_AD[tur].ad[0].toLocaleUpperCase("tr-TR")}${TANIM_AD[tur].ad.slice(1)} adı gerekli.` };
+  try {
+    const x = tur === "urunGrubu" ? await db.urunGrubu.create({ data: { ad } }) : await db.urunMarkasi.create({ data: { ad } });
+    await denetim(k.kullaniciAdi, "EKLE", TANIM_AD[tur].tablo, x.id);
+  } catch (e) {
+    return benzersiz(e, `Bu ${TANIM_AD[tur].ad} zaten var.`);
+  }
+  revalidatePath("/ayarlar");
+  revalidatePath("/stok");
+  return { tamam: "Eklendi." };
+}
+
+/** Ad değişikliği bağlı tüm ürünlerde görünür; ürünlerde ad değil tanım kaydı tutulur. */
+export async function urunTanimAdDegistir(tur: UrunTanim, id: number, _: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const ad = tanimAdi(f);
+  if (!ad) return { hata: "Ad boş olamaz." };
+  try {
+    if (tur === "urunGrubu") await db.urunGrubu.update({ where: { id }, data: { ad } });
+    else await db.urunMarkasi.update({ where: { id }, data: { ad } });
+  } catch (e) {
+    return benzersiz(e, `Bu ${TANIM_AD[tur].ad} zaten var.`);
+  }
+  await denetim(k.kullaniciAdi, "GUNCELLE", TANIM_AD[tur].tablo, id);
+  revalidatePath("/ayarlar");
+  revalidatePath("/stok");
+  return { tamam: "Kaydedildi." };
+}
+
+/** Konum, ÖTV oranı, kontrol maddesi, ürün grubu ve markası silinmez; pasif yapılır ki eski kayıtlar bozulmasın. */
+export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMaddesi" | UrunTanim, id: number) {
   const k = await yetkiIste("YONETICI");
   const where = { id };
   let aktif: boolean | undefined;
@@ -186,6 +224,12 @@ export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMad
   } else if (tablo === "otvOrani") {
     aktif = (await db.otvOrani.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.otvOrani.update({ where, data: { aktif: !aktif } });
+  } else if (tablo === "urunGrubu") {
+    aktif = (await db.urunGrubu.findUnique({ where }))?.aktif;
+    if (aktif !== undefined) await db.urunGrubu.update({ where, data: { aktif: !aktif } });
+  } else if (tablo === "urunMarkasi") {
+    aktif = (await db.urunMarkasi.findUnique({ where }))?.aktif;
+    if (aktif !== undefined) await db.urunMarkasi.update({ where, data: { aktif: !aktif } });
   } else {
     aktif = (await db.kontrolMaddesi.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.kontrolMaddesi.update({ where, data: { aktif: !aktif } });

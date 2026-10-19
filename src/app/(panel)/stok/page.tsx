@@ -5,27 +5,26 @@ import { URUN_TUR_AD, miktar, tl } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
 import { kritikDurum } from "@/lib/stokHesap";
+import { urunFiltresi } from "@/lib/stokTanim";
 
 export const metadata = { title: "Stok" };
 
 const DURUM = { eksi: ["kirmizi", "Eksi"], yok: ["gri", "Yok"], kritik: ["sari", "Kritik"], normal: null } as const;
 
-export default async function Stok({ searchParams }: { searchParams: Promise<{ q?: string; tur?: string; grup?: string; durum?: string; pasif?: string }> }) {
+export default async function Stok({ searchParams }: { searchParams: Promise<{ q?: string; tur?: string; grup?: string; marka?: string; durum?: string; pasif?: string }> }) {
   const k = await yetkiIste();
   const p = await searchParams;
-  const q = (p.q ?? "").trim().toLocaleUpperCase("tr-TR");
   const where: Prisma.UrunWhereInput = {
-    tur: p.tur ? (p.tur as Prisma.UrunWhereInput["tur"]) : { not: "ARAC" },
+    ...urunFiltresi(p),
     ...(p.pasif ? {} : { aktif: true }),
-    ...(p.grup ? { grup: p.grup } : {}),
     ...(p.durum === "eksi" ? { miktar: { lt: 0 } } : p.durum === "stokta" ? { miktar: { gt: 0 } } : {}),
-    ...(q ? { OR: [{ kod: { contains: q } }, { ad: { contains: q } }, { barkod: q }, { raf: { contains: q } }] } : {}),
   };
   const maliyet = maliyetGorur(k);
   const yonetebilir = k.rol === "YONETICI" || k.rol === "DEPO" || k.rol === "MUHASEBE";
-  const [hepsi, gruplar, ozet] = await Promise.all([
-    db.urun.findMany({ where, orderBy: [{ grup: "asc" }, { ad: "asc" }], take: p.durum === "kritik" ? undefined : 300 }),
-    db.urun.findMany({ where: { grup: { not: null }, tur: { not: "ARAC" } }, distinct: ["grup"], select: { grup: true }, orderBy: { grup: "asc" } }),
+  const [hepsi, gruplar, markalar, ozet] = await Promise.all([
+    db.urun.findMany({ where, include: { grup: true, marka: true }, orderBy: [{ grup: { ad: "asc" } }, { ad: "asc" }], take: p.durum === "kritik" ? undefined : 300 }),
+    db.urunGrubu.findMany({ orderBy: { ad: "asc" } }),
+    db.urunMarkasi.findMany({ orderBy: { ad: "asc" } }),
     db.$queryRaw<{ kart: bigint; deger: number | null; kritik: bigint; eksi: bigint }[]>`
       SELECT count(*) AS kart,
              sum(CASE WHEN "miktar" > 0 THEN "miktar" * coalesce("ortMaliyet", 0) END)::float AS deger,
@@ -56,15 +55,19 @@ export default async function Stok({ searchParams }: { searchParams: Promise<{ q
         <Kutu ad="Kritik seviyede" deger={Number(o.kritik).toLocaleString("tr-TR")} href={sorgu({ durum: "kritik" })} uyari={Number(o.kritik) > 0} />
         <Kutu ad="Eksi stokta" deger={Number(o.eksi).toLocaleString("tr-TR")} href={sorgu({ durum: "eksi" })} uyari={Number(o.eksi) > 0} />
       </div>
-      <form className="mb-4 grid gap-2 md:grid-cols-5">
-        <Girdi name="q" defaultValue={p.q} placeholder="Kod, ad, barkod veya raf" className="md:col-span-2" autoFocus />
+      <form className="mb-4 grid gap-2 md:grid-cols-6">
+        <Girdi name="q" defaultValue={p.q} placeholder="Kod, ad, barkod, marka veya raf" className="md:col-span-2" autoFocus />
         <Secim name="tur" defaultValue={p.tur ?? ""}>
           <option value="">Tüm türler</option>
           {["YEDEK_PARCA", "AKSESUAR", "HIZMET", "DIGER"].map((t) => <option key={t} value={t}>{URUN_TUR_AD[t]}</option>)}
         </Secim>
         <Secim name="grup" defaultValue={p.grup ?? ""}>
           <option value="">Tüm gruplar</option>
-          {gruplar.map((g) => <option key={g.grup} value={g.grup!}>{g.grup}</option>)}
+          {gruplar.map((g) => <option key={g.id} value={g.id}>{g.ad}</option>)}
+        </Secim>
+        <Secim name="marka" defaultValue={p.marka ?? ""}>
+          <option value="">Tüm markalar</option>
+          {markalar.map((g) => <option key={g.id} value={g.id}>{g.ad}</option>)}
         </Secim>
         <Secim name="durum" defaultValue={p.durum ?? ""}>
           <option value="">Tüm stok durumları</option>
@@ -76,9 +79,9 @@ export default async function Stok({ searchParams }: { searchParams: Promise<{ q
       </form>
       <div className="mb-2 flex justify-between text-xs text-zinc-500">
         <span>{urunler.length} ürün{urunler.length === 300 ? " (ilk 300, aramayı daraltın)" : ""}</span>
-        {maliyet && <a href={`/stok/csv${sorgu({ ...(p.tur ? { tur: p.tur } : {}), ...(p.grup ? { grup: p.grup } : {}) })}`} className="hover:underline">{"Excel'e aktar (CSV)"}</a>}
+        {maliyet && <a href={`/stok/csv${sorgu({ ...(p.tur ? { tur: p.tur } : {}), ...(p.grup ? { grup: p.grup } : {}), ...(p.marka ? { marka: p.marka } : {}) })}`} className="hover:underline">{"Excel'e aktar (CSV)"}</a>}
       </div>
-      <Tablo basliklar={["Kod", "Ürün", "Grup", "Raf", "Miktar", "", "Satış fiyatı", ...(maliyet ? ["Ort. maliyet", "Stok değeri"] : [])]} bos={!urunler.length}>
+      <Tablo basliklar={["Kod", "Ürün", "Grup", "Marka", "Raf", "Miktar", "", "Satış fiyatı", ...(maliyet ? ["Ort. maliyet", "Stok değeri"] : [])]} bos={!urunler.length}>
         {urunler.map((u) => {
           const m = Number(u.miktar);
           const d = u.tur === "HIZMET" ? null : DURUM[kritikDurum(m, u.kritikStok === null ? null : Number(u.kritikStok))];
@@ -86,7 +89,8 @@ export default async function Stok({ searchParams }: { searchParams: Promise<{ q
             <tr key={u.id} className={`hover:bg-zinc-50 ${u.aktif ? "" : "text-zinc-400"}`}>
               <Hucre><Link href={`/stok/${u.id}`} className="font-mono font-medium hover:underline">{u.kod}</Link></Hucre>
               <Hucre className="max-w-80 truncate"><Link href={`/stok/${u.id}`} className="hover:underline">{u.ad}</Link></Hucre>
-              <Hucre>{u.grup ?? "-"}</Hucre>
+              <Hucre>{u.grup?.ad ?? "-"}</Hucre>
+              <Hucre>{u.marka?.ad ?? "-"}</Hucre>
               <Hucre>{u.raf ?? "-"}</Hucre>
               <Hucre className={`text-right tabular-nums ${m < 0 ? "text-red-700" : ""}`}>{u.tur === "HIZMET" ? "-" : `${miktar(m)} ${u.birim}`}</Hucre>
               <Hucre>{d && <Etiket renk={d[0]}>{d[1]}</Etiket>}</Hucre>

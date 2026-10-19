@@ -94,3 +94,11 @@ describe("stok girişi doğrulama", () => {
     expect(girisToplam([{ miktar: 3, birimFiyat: 33.333, kdvOrani: 0.2 }, { miktar: 1, birimFiyat: 10, kdvOrani: 0.1 }])).toMatchObject({ araToplam: 110, kdvToplam: 21, genelToplam: 131 });
   });
 });
+
+describe("buyukHarfler", () => {
+  it("yabancı marka adlarını hem Türkçe hem düz büyük harfle arar", async () => {
+    const { buyukHarfler } = await import("../src/lib/stokTanim");
+    expect(buyukHarfler("maxxis")).toEqual(["MAXXİS", "MAXXIS"]);
+    expect(buyukHarfler("yağ")).toEqual(["YAĞ"]);
+  });
+});

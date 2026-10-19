@@ -282,7 +282,10 @@ model Urun {
   id          Int               @id @default(autoincrement())
   kod         String            @unique
   ad          String
-  grup        String?
+  grupId      Int?
+  grup        UrunGrubu?        @relation(fields: [grupId], references: [id])
+  markaId     Int?
+  marka       UrunMarkasi?      @relation(fields: [markaId], references: [id])
   tur         UrunTur
   birim       String            @default("Adet")
   barkod      String?
@@ -308,6 +311,21 @@ model Urun {
 
   @@index([barkod])
   @@index([ad])
+}
+
+/// Ürün grupları ve markaları Ayarlar'dan tanımlanır; silinmez, pasif yapılır.
+model UrunGrubu {
+  id      Int     @id @default(autoincrement())
+  ad      String  @unique
+  aktif   Boolean @default(true)
+  urunler Urun[]
+}
+
+model UrunMarkasi {
+  id      Int     @id @default(autoincrement())
+  ad      String  @unique
+  aktif   Boolean @default(true)
+  urunler Urun[]
 }
 
 model StokHareketi {

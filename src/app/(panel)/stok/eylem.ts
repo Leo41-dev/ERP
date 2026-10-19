@@ -23,6 +23,8 @@ export async function urunKaydet(id: number | null, _: UrunDurum, form: FormData
     const b = await db.urun.findFirst({ where: { barkod: veri.barkod, ...(id ? { NOT: { id } } : {}) }, select: { kod: true } });
     if (b) return { hatalar: { barkod: `Bu barkod ${b.kod} kodlu üründe kayıtlı.` } };
   }
+  if (veri.grupId && !(await db.urunGrubu.findUnique({ where: { id: veri.grupId }, select: { id: true } }))) return { hatalar: { grupId: "Grup bulunamadı." } };
+  if (veri.markaId && !(await db.urunMarkasi.findUnique({ where: { id: veri.markaId }, select: { id: true } }))) return { hatalar: { markaId: "Marka bulunamadı." } };
   if (id) {
     const eski = await db.urun.findUnique({ where: { id }, select: { tur: true, miktar: true } });
     if (!eski) return { genel: "Ürün bulunamadı." };

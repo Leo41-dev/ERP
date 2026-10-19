@@ -4,7 +4,7 @@ import { yuzde } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { BELGE_AYARLARI, belgeAyarlari, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
-import { aktiflikDegistir, belgeAyarKaydet, firmaKaydet, konumEkle, maddeEkle, maddeGuncelle, markaEkle, modelEkle, otvEkle, tipEkle } from "./eylem";
+import { aktiflikDegistir, belgeAyarKaydet, firmaKaydet, konumEkle, maddeEkle, maddeGuncelle, markaEkle, modelEkle, otvEkle, tipEkle, urunTanimAdDegistir, urunTanimEkle } from "./eylem";
 import { AktiflikButonu, AyarFormu } from "./Formlar";
 
 function Liste({ ogeler }: { ogeler: { id: number; ad: string; aktif?: boolean; sag?: React.ReactNode }[] }) {
@@ -23,7 +23,7 @@ function Liste({ ogeler }: { ogeler: { id: number; ad: string; aktif?: boolean; 
 
 export default async function Ayarlar() {
   await yetkiIste("YONETICI");
-  const [firmalar, konumlar, otvler, maddeler, tipler, markalar, kullaniciSayisi] = await Promise.all([
+  const [firmalar, konumlar, otvler, maddeler, tipler, markalar, kullaniciSayisi, urunGruplari, urunMarkalari] = await Promise.all([
     db.firma.findMany({ orderBy: { id: "asc" } }),
     db.konum.findMany({ orderBy: { ad: "asc" } }),
     db.otvOrani.findMany({ orderBy: { oran: "asc" } }),
@@ -31,6 +31,8 @@ export default async function Ayarlar() {
     db.aracTipi.findMany({ orderBy: { ad: "asc" } }),
     db.marka.findMany({ orderBy: { ad: "asc" }, include: { modeller: { include: { tip: true }, orderBy: [{ model: "asc" }, { altModel: "asc" }] } } }),
     db.kullanici.count({ where: { aktif: true } }),
+    db.urunGrubu.findMany({ orderBy: { ad: "asc" }, include: { _count: { select: { urunler: true } } } }),
+    db.urunMarkasi.findMany({ orderBy: { ad: "asc" }, include: { _count: { select: { urunler: true } } } }),
   ]);
   const belge = await belgeAyarlari();
   const aktifOtv = otvler.filter((o) => o.aktif);
@@ -113,6 +115,26 @@ export default async function Ayarlar() {
             </Secim>
           </AyarFormu>
         </Kart>
+
+        {([["urunGrubu", "Ürün grupları", urunGruplari, "Yeni grup (ör. FİLTRE)"], ["urunMarkasi", "Ürün markaları", urunMarkalari, "Yeni marka (ör. MOTUL)"]] as const).map(([tur, baslik, liste, ipucu]) => (
+          <Kart key={tur} baslik={baslik} sag={<span className="text-xs text-zinc-500">Stok kartlarında seçilir</span>}>
+            <ul className="mb-3 space-y-1.5">
+              {liste.map((x) => (
+                <li key={x.id} className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <AyarFormu eylem={urunTanimAdDegistir.bind(null, tur, x.id)} buton="Kaydet">
+                      <Girdi name="ad" defaultValue={x.ad} className={`w-auto flex-1 uppercase ${x.aktif ? "" : "text-zinc-400 line-through"}`} aria-label="Ad" />
+                    </AyarFormu>
+                  </div>
+                  <span className="w-14 pt-2 text-right text-xs text-zinc-500">{x._count.urunler} ürün</span>
+                  <div className="pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, tur, x.id)} /></div>
+                </li>
+              ))}
+              {!liste.length && <li className="text-sm text-zinc-500">Henüz kayıt yok.</li>}
+            </ul>
+            <AyarFormu eylem={urunTanimEkle.bind(null, tur)}><Girdi name="ad" placeholder={ipucu} className="w-auto flex-1 uppercase" required /></AyarFormu>
+          </Kart>
+        ))}
 
         <Kart baslik="Marka ve modeller" className="lg:col-span-2">
           <div className="mb-4 space-y-3">

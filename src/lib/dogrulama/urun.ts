@@ -6,7 +6,8 @@ export type UrunVeri = {
   kod: string; // boşsa kaydederken türüne göre üretilir
   ad: string;
   tur: Exclude<UrunTur, "ARAC">;
-  grup: string | null;
+  grupId: number | null;
+  markaId: number | null;
   birim: string;
   barkod: string | null;
   kdvOrani: number;
@@ -50,7 +51,8 @@ export function urunDogrula(f: FormData): { veri: UrunVeri; hatalar: Hatalar } {
       kod,
       ad,
       tur,
-      grup: metin(s("grup")) || null,
+      grupId: Number(s("grupId")) || null,
+      markaId: Number(s("markaId")) || null,
       birim: s("birim") || "Adet",
       barkod: s("barkod").replace(/\s+/g, "") || null,
       kdvOrani: kdvOrani ?? 0.2,

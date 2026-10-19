@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { buyukHarfler } from "@/lib/stokTanim";
 import { maliyetGorur, mevcutKullanici } from "@/lib/oturum";
 
 export type UrunBulunan = {
@@ -12,12 +13,12 @@ export async function GET(istek: Request) {
   const ham = (new URL(istek.url).searchParams.get("q") ?? "").trim();
   if (!ham) return Response.json([]);
   const q = ham.toLocaleUpperCase("tr-TR");
-  const kelimeler = q.split(/\s+/).filter(Boolean).slice(0, 5);
+  const kelimeler = ham.split(/\s+/).filter(Boolean).slice(0, 5);
   const urunler = await db.urun.findMany({
     where: {
       aktif: true,
       tur: { not: "ARAC" },
-      OR: [{ barkod: ham }, { kod: q }, { AND: kelimeler.map((w) => ({ OR: [{ ad: { contains: w } }, { kod: { contains: w } }] })) }],
+      OR: [{ barkod: ham }, { kod: q }, { AND: kelimeler.map((w) => ({ OR: buyukHarfler(w).flatMap((b) => [{ ad: { contains: b } }, { kod: { contains: b } }]) })) }],
     },
     orderBy: { ad: "asc" },
     take: 30,

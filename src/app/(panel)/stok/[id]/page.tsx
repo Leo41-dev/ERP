@@ -14,7 +14,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
   const k = await yetkiIste();
   const id = Number((await params).id);
   const p = await searchParams;
-  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id } }) : null;
+  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id }, include: { grup: true, marka: true } }) : null;
   if (!u || u.tur === "ARAC") notFound();
   const maliyet = maliyetGorur(k);
   const yonetebilir = k.rol === "YONETICI" || k.rol === "DEPO" || k.rol === "MUHASEBE";
@@ -45,7 +45,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
     <>
       <SayfaBaslik
         baslik={u.ad}
-        aciklama={<><span className="font-mono">{u.kod}</span> · {URUN_TUR_AD[u.tur]}{u.grup ? ` · ${u.grup}` : ""}{!u.aktif && " · pasif"}</>}
+        aciklama={<><span className="font-mono">{u.kod}</span> · {URUN_TUR_AD[u.tur]}{u.grup ? ` · ${u.grup.ad}` : ""}{u.marka ? ` · ${u.marka.ad}` : ""}{!u.aktif && " · pasif"}</>}
         sag={yonetebilir && <BaglantiButon href={`/stok/${u.id}/duzenle`}>Düzenle</BaglantiButon>}
       />
       {p.kayit && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Ürün kartı kaydedildi.</p>}

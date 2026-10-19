@@ -4,15 +4,16 @@ import { sifirlamadan } from "@/components/form";
 import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/components/ui";
 import { BIRIMLER } from "@/lib/dogrulama/urun";
 import { URUN_TUR_AD } from "@/lib/bicim";
+import type { Tanim } from "@/lib/stokTanim";
 import type { UrunDurum } from "./eylem";
 
 type Eylem = (d: UrunDurum, f: FormData) => Promise<UrunDurum>;
-type Alanlar = "ad" | "tur" | "kod" | "barkod" | "grup" | "birim" | "raf" | "kritikStok" | "satisFiyati" | "kdvOrani" | "alisFiyati" | "not";
+type Alanlar = "ad" | "tur" | "kod" | "barkod" | "grupId" | "markaId" | "birim" | "raf" | "kritikStok" | "satisFiyati" | "kdvOrani" | "alisFiyati" | "not";
 export type UrunVarsayilan = Partial<Record<Alanlar, string>> & { aktif?: boolean };
 
 const KDV = ["0.2", "0.1", "0.01", "0"];
 
-export function UrunFormu({ eylem, v = {}, gruplar, yeni, maliyetGoster }: { eylem: Eylem; v?: UrunVarsayilan; gruplar: string[]; yeni?: boolean; maliyetGoster: boolean }) {
+export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoster, yonetici }: { eylem: Eylem; v?: UrunVarsayilan; gruplar: Tanim[]; markalar: Tanim[]; yeni?: boolean; maliyetGoster: boolean; yonetici: boolean }) {
   const [durum, gonder, bekliyor] = useActionState(eylem, undefined);
   const h = durum?.hatalar ?? {};
   return (
@@ -29,16 +30,23 @@ export function UrunFormu({ eylem, v = {}, gruplar, yeni, maliyetGoster }: { eyl
           </Alan>
           <Alan etiket="Stok kodu" hata={h.kod}><Girdi name="kod" defaultValue={v.kod} placeholder="Boş bırakılırsa otomatik verilir" className="font-mono uppercase" /></Alan>
           <Alan etiket="Barkod" hata={h.barkod}><Girdi name="barkod" defaultValue={v.barkod} className="font-mono" /></Alan>
-          <Alan etiket="Grup">
-            <datalist id="urun-gruplar">{gruplar.map((g) => <option key={g} value={g} />)}</datalist>
-            <Girdi name="grup" list="urun-gruplar" defaultValue={v.grup} placeholder="Yağ, lastik, kask..." className="uppercase" />
-          </Alan>
+          {([["grupId", "Grup", gruplar], ["markaId", "Marka", markalar]] as const).map(([ad, etiket, liste]) => (
+            <Alan key={ad} etiket={etiket} hata={h[ad]}>
+              <Secim name={ad} defaultValue={v[ad] ?? ""}>
+                <option value="">Seçilmedi</option>
+                {liste.map((x) => <option key={x.id} value={x.id}>{x.ad}{x.aktif ? "" : " (pasif)"}</option>)}
+              </Secim>
+            </Alan>
+          ))}
           <Alan etiket="Birim">
             <Secim name="birim" defaultValue={v.birim ?? "Adet"}>{BIRIMLER.map((b) => <option key={b}>{b}</option>)}</Secim>
           </Alan>
           <Alan etiket="Raf / yer"><Girdi name="raf" defaultValue={v.raf} className="uppercase" /></Alan>
           <Alan etiket="Kritik stok seviyesi" hata={h.kritikStok}><Girdi name="kritikStok" inputMode="decimal" defaultValue={v.kritikStok} placeholder="Bu miktara düşünce uyarır" /></Alan>
         </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          Grup ve marka listesi Ayarlar&apos;dan yönetilir{yonetici ? <> (<a href="/ayarlar" className="underline" target="_blank">listeyi aç</a>)</> : ", yöneticiye eklettirin"}.
+        </p>
       </Kart>
       <Kart baslik="Fiyat">
         <div className="grid gap-4 md:grid-cols-3">

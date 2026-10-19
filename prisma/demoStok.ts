@@ -33,6 +33,11 @@ const URUNLER: [string, string, UrunTur, string, string, string, number | null, 
   ["DG-00001", "ZİNCİR VE GRES SPREYİ 400 ML", "DIGER", "SARF", "Adet", "A2", 10, 210, 420, 24, 0, 18],
   ["DG-00002", "RADYATÖR SUYU (ANTİFRİZ) 3 LT", "DIGER", "SARF", "Adet", "A2", 6, 280, 520, 10, 12, 18],
 ];
+// ürün koduna göre marka
+const MARKA: Record<string, string> = {
+  "YP-00001": "MOTUL", "YP-00002": "MOTUL", "YP-00003": "CFMOTO", "YP-00004": "BRP", "YP-00005": "CFMOTO", "YP-00006": "NGK", "YP-00007": "CFMOTO", "YP-00008": "CFMOTO",
+  "YP-00009": "BRP", "YP-00010": "CFMOTO", "YP-00011": "YUASA", "YP-00012": "MAXXIS", "YP-00013": "MAXXIS", "AK-00001": "WARN", "DG-00001": "MOTUL",
+};
 const HIZMETLER: [string, string, number][] = [["HZ-00001", "PERİYODİK BAKIM İŞÇİLİĞİ", 3500], ["HZ-00002", "LASTİK MONTAJ VE BALANS (4 TEKER)", 1200], ["HZ-00003", "AKSESUAR MONTAJ İŞÇİLİĞİ (SAAT)", 900]];
 
 async function main() {
@@ -41,11 +46,14 @@ async function main() {
     if ((await db.urun.count()) > 0) return console.log("Örnek stok atlandı: ürün kartları zaten var.");
     await db.$transaction(async (tx) => {
       const ted = await tx.cari.create({ data: { unvan: "ÖRNEK MOTOR PARÇA TİC. LTD. ŞTİ.", tip: "KURUMSAL", rol: "TEDARIKCI", not: "Demo verisi" } });
+      const grupId = new Map<string, number>(), markaId = new Map<string, number>();
+      for (const ad of new Set([...URUNLER.map((u) => u[3]), "SERVİS"])) grupId.set(ad, (await tx.urunGrubu.upsert({ where: { ad }, update: {}, create: { ad } })).id);
+      for (const ad of new Set(Object.values(MARKA))) markaId.set(ad, (await tx.urunMarkasi.upsert({ where: { ad }, update: {}, create: { ad } })).id);
       const gelenler: { urunId: number; miktar: number; fiyat: number }[] = [];
       const cikanlar: { urunId: number; miktar: number }[] = [];
       for (const [i, [kod, ad, tur, grup, birim, raf, kritik, alis, satis, acilis, gelen, cikan]] of URUNLER.entries()) {
         const u = await tx.urun.create({
-          data: { kod, ad, tur, grup, birim, raf, kritikStok: kritik === null ? null : dec(kritik), alisFiyati: dec(alis), satisFiyati: dec(satis), kdvDahil: true, kdvOrani: dec(0.2), barkod: `2000000${String(i + 1).padStart(5, "0")}` },
+          data: { kod, ad, tur, grupId: grupId.get(grup), markaId: MARKA[kod] ? markaId.get(MARKA[kod]) : undefined, birim, raf, kritikStok: kritik === null ? null : dec(kritik), alisFiyati: dec(alis), satisFiyati: dec(satis), kdvDahil: true, kdvOrani: dec(0.2), barkod: `2000000${String(i + 1).padStart(5, "0")}` },
         });
         await stokHareketYaz(tx, { urunId: u.id, tur: "ACILIS", miktar: acilis, birimMaliyet: alis * 0.95, tarih: gunOnce(60), aciklama: "Açılış stoğu", kaydeden: "Demo" });
         if (gelen) gelenler.push({ urunId: u.id, miktar: gelen, fiyat: alis });
@@ -61,7 +69,7 @@ async function main() {
       }
       // geçmiş satışlar ve servis kullanımı tek bir çıkışla özetlenir; hareket dökümü dolu görünsün diye
       for (const x of cikanlar) await stokHareketYaz(tx, { urunId: x.urunId, tur: "CIKIS", miktar: -x.miktar, tarih: gunOnce(5), aciklama: "Demo: önceki satışlar ve servis kullanımı", kaydeden: "Demo" });
-      for (const [kod, ad, fiyat] of HIZMETLER) await tx.urun.create({ data: { kod, ad, tur: "HIZMET", grup: "SERVİS", birim: "Adet", satisFiyati: dec(fiyat), kdvDahil: true, kdvOrani: dec(0.2) } });
+      for (const [kod, ad, fiyat] of HIZMETLER) await tx.urun.create({ data: { kod, ad, tur: "HIZMET", grupId: grupId.get("SERVİS"), birim: "Adet", satisFiyati: dec(fiyat), kdvDahil: true, kdvOrani: dec(0.2) } });
     }, { timeout: 60_000 });
     console.log(`Örnek stok yüklendi (${URUNLER.length} ürün, ${HIZMETLER.length} hizmet).`);
   } finally {
