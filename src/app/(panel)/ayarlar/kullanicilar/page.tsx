@@ -9,7 +9,7 @@ export default async function Kullanicilar() {
   const liste = await db.kullanici.findMany({ orderBy: [{ aktif: "desc" }, { adSoyad: "asc" }] });
   return (
     <>
-      <SayfaBaslik baslik="Kullanıcılar" aciklama={<><Link href="/ayarlar" className="hover:underline">Ayarlar</Link> / Kullanıcılar</>} sag={<BaglantiButon href="/ayarlar/kullanicilar/yeni">Yeni kullanıcı</BaglantiButon>} />
+      <SayfaBaslik baslik="Kullanıcılar" sag={<BaglantiButon href="/ayarlar/kullanicilar/yeni">Yeni kullanıcı</BaglantiButon>} />
       <Tablo basliklar={["Ad soyad", "Kullanıcı adı", "Rol", "Durum", "Son giriş"]} bos={!liste.length}>
         {liste.map((x) => (
           <tr key={x.id}>

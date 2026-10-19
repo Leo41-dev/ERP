@@ -10,6 +10,7 @@ import { norm } from "@/lib/fatura/esle";
 import { faturaUrunOku, urunEslemeAnahtari, type FaturaUrun } from "@/lib/fatura/urunOku";
 import { yetkiIste } from "@/lib/oturum";
 import { stokHareketYaz, yeniUrunKodu } from "@/lib/stok";
+import { marjliFiyat } from "@/lib/stokHesap";
 import type { UrunBulunan } from "../ara/route";
 
 export type GirisDurum = { hatalar?: Hatalar; genel?: string; uyari?: string; onayIste?: boolean } | undefined;
@@ -20,8 +21,8 @@ export type XmlSonuc =
   | { faturaNo: string; tarih: string; tedarikci: { id: number | null; unvan: string; vkn: string }; satirlar: XmlSatir[]; uyarilar: string[] };
 
 const dec = (n: number) => new Prisma.Decimal(n);
-const bulunan = (u: { id: number; kod: string; ad: string; birim: string; tur: string; miktar: Prisma.Decimal; satisFiyati: Prisma.Decimal | null; kdvOrani: Prisma.Decimal; barkod: string | null }): UrunBulunan => ({
-  id: u.id, kod: u.kod, ad: u.ad, birim: u.birim, tur: u.tur, miktar: Number(u.miktar), satisFiyati: u.satisFiyati === null ? null : Number(u.satisFiyati), kdvOrani: Number(u.kdvOrani), barkod: u.barkod,
+const bulunan = (u: { id: number; kod: string; ad: string; birim: string; tur: string; miktar: Prisma.Decimal; satisFiyati: Prisma.Decimal | null; kdvOrani: Prisma.Decimal; otvOrani: Prisma.Decimal; barkod: string | null }): UrunBulunan => ({
+  id: u.id, kod: u.kod, ad: u.ad, birim: u.birim, tur: u.tur, miktar: Number(u.miktar), satisFiyati: u.satisFiyati === null ? null : Number(u.satisFiyati), kdvOrani: Number(u.kdvOrani), otvOrani: Number(u.otvOrani), barkod: u.barkod,
 });
 
 /** Yüklenen e-fatura XML'ini okuyup satırları stok kartlarıyla eşler; kayıt yapmaz. */
@@ -121,7 +122,10 @@ export async function girisKaydet(_: GirisDurum, form: FormData): Promise<GirisD
           yeniKartlar.set(anahtar, urunId);
         }
       } else {
-        await tx.urun.update({ where: { id: urunId }, data: { alisFiyati: dec(x.birimFiyat) } });
+        // kâr oranıyla fiyatlanan üründe yeni alış fiyatı satış fiyatını da günceller
+        const u = await tx.urun.findUnique({ where: { id: urunId }, select: { fiyatTipi: true, karOrani: true, kdvOrani: true, otvOrani: true } });
+        const satis = u?.fiyatTipi === "MARJ" && u.karOrani !== null ? { satisFiyati: dec(marjliFiyat(x.birimFiyat, Number(u.karOrani), Number(u.kdvOrani), Number(u.otvOrani))) } : {};
+        await tx.urun.update({ where: { id: urunId }, data: { alisFiyati: dec(x.birimFiyat), ...satis } });
       }
       await tx.stokGirisKalemi.create({
         data: { girisId: g.id, sira: i + 1, urunId, faturaAdi: x.faturaAdi, miktar: dec(x.miktar), birimFiyat: dec(x.birimFiyat), kdvOrani: dec(x.kdvOrani), tutar: dec(t.satirlar[i].tutar) },

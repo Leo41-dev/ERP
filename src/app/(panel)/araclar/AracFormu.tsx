@@ -5,6 +5,7 @@ import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/compo
 import { MALIYET_TURLERI } from "@/lib/dogrulama/arac";
 import type { AracDurum } from "./eylem";
 import type { AracFormListeleri } from "./veri";
+import { secenekli } from "@/lib/vergi";
 
 type Eylem = (d: AracDurum, f: FormData) => Promise<AracDurum>;
 export type AracVarsayilan = Partial<Record<string, string>>;
@@ -74,7 +75,7 @@ export function AracFormu({ eylem, listeler, v = {}, maliyetGoster }: { eylem: E
           <Alan etiket="Alış şekli"><Girdi name="alisSekli" defaultValue={v.alisSekli} placeholder="Fatura, noter, konsinye..." /></Alan>
           <Alan etiket="KDV oranı" hata={h.kdvOrani}>
             <Secim name="kdvOrani" defaultValue={v.kdvOrani ?? "0.2"}>
-              {["0.2", "0.1", "0.01", "0"].map((o) => <option key={o} value={o}>{yuzdeYaz(Number(o))}</option>)}
+              {secenekli(listeler.kdvOranlari, v.kdvOrani).map((o) => <option key={o} value={o}>{yuzdeYaz(Number(o))}</option>)}
             </Secim>
           </Alan>
           <Alan etiket="ÖTV oranı (elle seçilir)">

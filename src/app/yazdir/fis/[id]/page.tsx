@@ -63,6 +63,7 @@ export default async function Fis({ params }: { params: Promise<{ id: string }> 
           </tbody>
         </table>
         <div className={cizgi} />
+        {Number(s.otvToplam) > 0 && <div className="flex justify-between text-zinc-700"><span>ÖTV</span><span>{tl(s.otvToplam)}</span></div>}
         {[...kdvOzet.entries()].map(([o, v]) => (
           <div key={o} className="flex justify-between text-zinc-700"><span>KDV {o} (matrah {tl(v.matrah)})</span><span>{tl(v.kdv)}</span></div>
         ))}

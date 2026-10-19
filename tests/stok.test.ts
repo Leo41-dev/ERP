@@ -102,3 +102,18 @@ describe("buyukHarfler", () => {
     expect(buyukHarfler("yağ")).toEqual(["YAĞ"]);
   });
 });
+
+describe("kâr oranıyla fiyat", () => {
+  it("maliyet × (1 + kâr) üzerine ÖTV ve KDV ekler", async () => {
+    const { marjliFiyat, fiyattanKarOrani } = await import("../src/lib/stokHesap");
+    expect(marjliFiyat(100, 0.3, 0.2)).toBe(156);
+    expect(marjliFiyat(100, 0.3, 0.2, 0.25)).toBe(195);
+    expect(fiyattanKarOrani(195, 100, 0.2, 0.25)).toBeCloseTo(0.3, 10);
+    expect(fiyattanKarOrani(195, null, 0.2)).toBeNull();
+  });
+  it("hızlı satışta ürün ÖTV'si kırılıma girer", async () => {
+    const { kalemHesapla } = await import("../src/lib/satis/hesap");
+    const h = kalemHesapla([{ aciklama: "X", miktar: 1, birimFiyat: 195, kdvOrani: 0.2, otvOrani: 0.25 }]);
+    expect(h).toMatchObject({ genelToplam: 195, matrah: 130, otv: 32.5, kdv: 32.5 });
+  });
+});

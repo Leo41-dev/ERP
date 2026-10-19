@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { kdvOranlari } from "@/lib/vergi";
 
 /** Araç formunun seçim listeleri */
 export async function aracFormListeleri() {
@@ -20,6 +21,7 @@ export async function aracFormListeleri() {
     konumlar: konumlar.map((k) => ({ id: k.id, ad: k.ad })),
     tedarikciler,
     otvOranlari: otvOranlari.map((o) => Number(o.oran)),
+    kdvOranlari: await kdvOranlari(db),
   };
 }
 export type AracFormListeleri = Awaited<ReturnType<typeof aracFormListeleri>>;

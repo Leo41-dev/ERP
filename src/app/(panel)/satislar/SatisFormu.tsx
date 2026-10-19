@@ -16,7 +16,7 @@ export type TekliftenSatis = {
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const yuzde = (o: number) => `%${(o * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 
-export function SatisFormu({ araclar, secili, otvOranlari, teklif }: { araclar: Arac[]; secili?: number; otvOranlari: number[]; teklif?: TekliftenSatis }) {
+export function SatisFormu({ araclar, secili, otvOranlari, kdvOranlari, teklif }: { araclar: Arac[]; secili?: number; otvOranlari: number[]; kdvOranlari: string[]; teklif?: TekliftenSatis }) {
   const [durum, gonder, bekliyor] = useActionState(satisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const ilk = araclar.find((a) => a.id === secili);
@@ -121,7 +121,7 @@ export function SatisFormu({ araclar, secili, otvOranlari, teklif }: { araclar: 
           </Alan>
           <Alan etiket="KDV oranı" hata={h.kdvOrani}>
             <Secim name="kdvOrani" value={kdv} onChange={(e) => setKdv(e.target.value)}>
-              {["0.2", "0.1", "0.01", "0"].map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
+              {kdvOranlari.map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
             </Secim>
           </Alan>
           <Alan etiket="ÖTV oranı (elle seçilir)" hata={h.otvOrani}>

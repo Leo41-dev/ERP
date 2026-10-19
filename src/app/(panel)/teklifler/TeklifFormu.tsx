@@ -5,6 +5,7 @@ import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/compo
 import { sayi } from "@/lib/normalize";
 import { teklifHesapla } from "@/lib/satis/hesap";
 import type { TeklifDurumu } from "./eylem";
+import { secenekli } from "@/lib/vergi";
 
 export type ModelSecenek = { id: number; etiket: string; otv: number | null; stok: number };
 export type TeklifBaslangic = {
@@ -15,11 +16,11 @@ type Kalem = TeklifBaslangic["kalemler"][number] & { anahtar: number };
 
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const yuzde = (o: number) => `%${(o * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
-const KDV = ["0.2", "0.1", "0.01", "0"];
 const anahtarUret = () => Date.now() + Math.random();
 const bosKalem = (): Kalem => ({ anahtar: anahtarUret(), aciklama: "", modelId: null, miktar: "1", fiyat: "", kdv: "0.2", otv: "0" });
 
-export function TeklifFormu({ eylem, modeller, otvOranlari, oneriler, firmalar, baslangic, dugme }: {
+export function TeklifFormu({ eylem, modeller, otvOranlari, kdvOranlari, oneriler, firmalar, baslangic, dugme }: {
+  kdvOranlari: string[];
   eylem: (d: TeklifDurumu, f: FormData) => Promise<TeklifDurumu>;
   modeller: ModelSecenek[];
   otvOranlari: number[];
@@ -98,7 +99,7 @@ export function TeklifFormu({ eylem, modeller, otvOranlari, oneriler, firmalar, 
                     {otvSecenek.map((o) => <option key={o} value={String(o)}>{o ? yuzde(o) : "Yok"}</option>)}
                   </Secim>
                   <Secim name="kalem_kdv" value={k.kdv} onChange={(e) => guncelle(k.anahtar, "kdv", e.target.value)} aria-label="KDV">
-                    {KDV.map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
+                    {secenekli(kdvOranlari, k.kdv).map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
                   </Secim>
                   <span className="self-center text-right text-sm">{tutar ? tl(tutar) : "-"}</span>
                   <Buton type="button" tur="ikincil" onClick={() => setKalemler((l) => l.filter((x) => x.anahtar !== k.anahtar))} disabled={kalemler.length === 1}>Sil</Buton>

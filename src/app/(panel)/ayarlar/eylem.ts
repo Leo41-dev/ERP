@@ -79,7 +79,7 @@ export async function firmaKaydet(_: AyarDurum, f: FormData): Promise<AyarDurum>
   } catch (e) {
     return benzersiz(e, "Bu vergi numarasıyla bir firma var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Kaydedildi." };
 }
 
@@ -95,7 +95,7 @@ export async function konumEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu konum zaten var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -109,7 +109,21 @@ export async function otvEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu oran listede var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
+  return { tamam: "Eklendi." };
+}
+
+export async function kdvEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const n = sayi(f.get("oran"));
+  if (n === null || n < 0 || n > 100) return { hata: "Oranı yüzde olarak girin (0-100)." };
+  try {
+    const x = await db.kdvOrani.create({ data: { oran: Math.round(n * 100) / 10000 } });
+    await denetim(k.kullaniciAdi, "EKLE", "KdvOrani", x.id);
+  } catch (e) {
+    return benzersiz(e, "Bu oran listede var.");
+  }
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -124,7 +138,7 @@ export async function maddeEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu madde zaten var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -139,7 +153,7 @@ export async function tipEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu tip zaten var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -153,7 +167,7 @@ export async function markaEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu marka zaten var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -171,7 +185,7 @@ export async function modelEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   } catch (e) {
     return benzersiz(e, "Bu model zaten var.");
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Eklendi." };
 }
 
@@ -191,7 +205,7 @@ export async function urunTanimEkle(tur: UrunTanim, _: AyarDurum, f: FormData): 
   } catch (e) {
     return benzersiz(e, `Bu ${TANIM_AD[tur].ad} zaten var.`);
   }
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   revalidatePath("/stok");
   return { tamam: "Eklendi." };
 }
@@ -208,13 +222,13 @@ export async function urunTanimAdDegistir(tur: UrunTanim, id: number, _: AyarDur
     return benzersiz(e, `Bu ${TANIM_AD[tur].ad} zaten var.`);
   }
   await denetim(k.kullaniciAdi, "GUNCELLE", TANIM_AD[tur].tablo, id);
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   revalidatePath("/stok");
   return { tamam: "Kaydedildi." };
 }
 
 /** Konum, ÖTV oranı, kontrol maddesi, ürün grubu ve markası silinmez; pasif yapılır ki eski kayıtlar bozulmasın. */
-export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMaddesi" | UrunTanim, id: number) {
+export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kdvOrani" | "kontrolMaddesi" | UrunTanim, id: number) {
   const k = await yetkiIste("YONETICI");
   const where = { id };
   let aktif: boolean | undefined;
@@ -224,6 +238,9 @@ export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMad
   } else if (tablo === "otvOrani") {
     aktif = (await db.otvOrani.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.otvOrani.update({ where, data: { aktif: !aktif } });
+  } else if (tablo === "kdvOrani") {
+    aktif = (await db.kdvOrani.findUnique({ where }))?.aktif;
+    if (aktif !== undefined) await db.kdvOrani.update({ where, data: { aktif: !aktif } });
   } else if (tablo === "urunGrubu") {
     aktif = (await db.urunGrubu.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.urunGrubu.update({ where, data: { aktif: !aktif } });
@@ -236,21 +253,22 @@ export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kontrolMad
   }
   if (aktif === undefined) return;
   await denetim(k.kullaniciAdi, aktif ? "PASIF" : "AKTIF", tablo, id);
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
 }
 
 /* ---------- yazdırılan belgeler ---------- */
 
 export async function belgeAyarKaydet(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   const k = await yetkiIste("YONETICI");
-  for (const anahtar of Object.keys(BELGE_AYARLARI)) {
+  // her bölüm yalnızca kendi alanlarını gönderir; formda olmayan anahtara dokunulmaz
+  for (const anahtar of Object.keys(BELGE_AYARLARI).filter((x) => f.has(x))) {
     const deger = String(f.get(anahtar) ?? "").trim();
     // varsayılanla aynı ya da boşsa kayıt tutulmaz; belge varsayılanı kullanır
     if (!deger || deger === BELGE_AYARLARI[anahtar as BelgeAyarAnahtari].varsayilan) await db.ayar.deleteMany({ where: { anahtar } });
     else await db.ayar.upsert({ where: { anahtar }, update: { deger }, create: { anahtar, deger } });
   }
   await denetim(k.kullaniciAdi, "GUNCELLE", "Ayar", "belge");
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Kaydedildi." };
 }
 
@@ -266,6 +284,6 @@ export async function maddeGuncelle(id: number, _: AyarDurum, f: FormData): Prom
     return benzersiz(e, "Bu madde zaten var.");
   }
   await denetim(k.kullaniciAdi, "GUNCELLE", "KontrolMaddesi", id);
-  revalidatePath("/ayarlar");
+  revalidatePath("/ayarlar", "layout");
   return { tamam: "Kaydedildi." };
 }

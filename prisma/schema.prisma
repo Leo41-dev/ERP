@@ -84,6 +84,12 @@ enum StokHareketTur {
   IPTAL // iptal edilen satışın stoğa dönüşü
 }
 
+/// Ürün satış fiyatı elle mi girilir, yoksa son alış fiyatı üzerine kâr oranıyla mı hesaplanır
+enum FiyatTipi {
+  SABIT
+  MARJ
+}
+
 enum SayimDurum {
   ACIK
   KAPALI
@@ -169,6 +175,12 @@ model Konum {
 }
 
 // ÖTV elle seçilir; bu tablo seçilebilecek oranların listesidir.
+model KdvOrani {
+  id    Int     @id @default(autoincrement())
+  oran  Decimal @unique @db.Decimal(6, 4)
+  aktif Boolean @default(true)
+}
+
 model OtvOrani {
   id    Int     @id @default(autoincrement())
   oran  Decimal @unique @db.Decimal(6, 4)
@@ -294,6 +306,8 @@ model Urun {
   alisFiyati  Decimal?          @db.Decimal(14, 2)
   satisFiyati Decimal?          @db.Decimal(14, 2)
   kdvDahil    Boolean           @default(false) // satış fiyatı KDV dahil mi
+  fiyatTipi   FiyatTipi         @default(SABIT)
+  karOrani    Decimal?          @db.Decimal(8, 4) // MARJ: satış fiyatı = son alış × (1 + kâr oranı) + vergiler
   paraBirimi  ParaBirimi        @default(TRY)
   raf         String?
   kritikStok  Decimal?          @db.Decimal(14, 3)

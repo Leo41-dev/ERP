@@ -2,6 +2,7 @@ import { SayfaBaslik } from "@/components/ui";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { SatisFormu } from "../SatisFormu";
+import { kdvOranlari } from "@/lib/vergi";
 
 export default async function YeniSatis({ searchParams }: { searchParams: Promise<{ arac?: string; teklif?: string }> }) {
   const k = await yetkiIste("SATIS");
@@ -40,6 +41,7 @@ export default async function YeniSatis({ searchParams }: { searchParams: Promis
         secili={secili}
         teklif={teklif}
         otvOranlari={otvOranlari.map((o) => Number(o.oran))}
+        kdvOranlari={await kdvOranlari(db)}
         araclar={araclar.map((a) => ({
           id: a.id,
           modelId: a.modelId,

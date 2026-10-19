@@ -1,16 +1,19 @@
 import type { Prisma } from "@prisma/client";
+import { kdvOranlari, otvOranlariYazi } from "./vergi";
 
-type Db = Pick<Prisma.TransactionClient, "urunGrubu" | "urunMarkasi">;
+type Db = Pick<Prisma.TransactionClient, "urunGrubu" | "urunMarkasi" | "kdvOrani" | "otvOrani">;
 export type Tanim = { id: number; ad: string; aktif: boolean };
 
-/** Ürün formu için grup ve marka seçenekleri: aktif olanlar, artı üründe seçili olan pasif kayıt */
+/** Ürün formu seçenekleri: aktif grup ve markalar (artı üründe seçili olan pasif kayıt), KDV ve ÖTV oranları */
 export async function urunTanimlari(db: Db, secili: { grupId?: number | null; markaId?: number | null } = {}) {
   const kosul = (id?: number | null) => ({ OR: [{ aktif: true }, ...(id ? [{ id }] : [])] });
-  const [gruplar, markalar] = await Promise.all([
+  const [gruplar, markalar, kdv, otv] = await Promise.all([
     db.urunGrubu.findMany({ where: kosul(secili.grupId), orderBy: { ad: "asc" }, select: { id: true, ad: true, aktif: true } }),
     db.urunMarkasi.findMany({ where: kosul(secili.markaId), orderBy: { ad: "asc" }, select: { id: true, ad: true, aktif: true } }),
+    kdvOranlari(db),
+    otvOranlariYazi(db),
   ]);
-  return { gruplar, markalar };
+  return { gruplar, markalar, kdvOranlari: kdv, otvOranlari: otv };
 }
 
 /** Arama metninin büyük harf biçimleri: "maxxis" hem MAXXİS hem MAXXIS olarak aranır (yabancı marka adları) */

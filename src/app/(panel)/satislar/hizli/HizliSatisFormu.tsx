@@ -7,17 +7,18 @@ import { UrunSecici, type UrunBulunan } from "@/components/UrunSecici";
 import { sayi } from "@/lib/normalize";
 import { kalemHesapla } from "@/lib/satis/hesap";
 import { hizliSatisKaydet } from "./eylem";
+import { yuzde } from "@/lib/bicim";
+import { secenekli } from "@/lib/vergi";
 
 type Kalem = { anahtar: number; aciklama: string; miktar: string; fiyat: string; kdv: string; urun?: UrunBulunan | null };
 
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
-const KDV = ["0.2", "0.1", "0.01", "0"];
 const bosKalem = (): Kalem => ({ anahtar: Date.now() + Math.random(), aciklama: "", miktar: "1", fiyat: "", kdv: "0.2" });
 
 export type TekliftenHizli = { id: number; no: number; unvan: string; telefon: string; kimlikNo: string; kalemler: Omit<Kalem, "anahtar">[] };
 const virgul = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 2, useGrouping: false });
 
-export function HizliSatisFormu({ firmalar, teklif }: { firmalar: { id: number; unvan: string; varsayilan: boolean }[]; teklif?: TekliftenHizli }) {
+export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: { id: number; unvan: string; varsayilan: boolean }[]; teklif?: TekliftenHizli; kdvOranlari: string[] }) {
   const [durum, gonder, bekliyor] = useActionState(hizliSatisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const [kalemler, setKalemler] = useState<Kalem[]>(() => (teklif?.kalemler.length ? teklif.kalemler.map((x) => ({ ...x, anahtar: Date.now() + Math.random() })) : [bosKalem()]));
@@ -25,7 +26,7 @@ export function HizliSatisFormu({ firmalar, teklif }: { firmalar: { id: number; 
   const [tutarElle, setTutarElle] = useState(false);
 
   const hesap = kalemHesapla(
-    kalemler.map((k) => ({ aciklama: k.aciklama, miktar: sayi(k.miktar) ?? 0, birimFiyat: sayi(k.fiyat) ?? 0, kdvOrani: Number(k.kdv) })).filter((k) => k.miktar > 0 && k.birimFiyat > 0),
+    kalemler.map((k) => ({ aciklama: k.aciklama, miktar: sayi(k.miktar) ?? 0, birimFiyat: sayi(k.fiyat) ?? 0, kdvOrani: Number(k.kdv), otvOrani: k.urun?.otvOrani ?? 0 })).filter((k) => k.miktar > 0 && k.birimFiyat > 0),
   );
   // tek ödeme satırı varsa ve elle değiştirilmediyse tutar toplamı izler
   const odemeListesi = odemeler.length === 1 && !tutarElle ? [{ ...odemeler[0], tutar: hesap.genelToplam ? String(hesap.genelToplam).replace(".", ",") : "" }] : odemeler;
@@ -83,7 +84,7 @@ export function HizliSatisFormu({ firmalar, teklif }: { firmalar: { id: number; 
                 <Girdi name="kalem_miktar" inputMode="decimal" value={k.miktar} onChange={(e) => kalemGuncelle(k.anahtar, "miktar", e.target.value)} aria-label="Adet" />
                 <Girdi name="kalem_fiyat" inputMode="decimal" placeholder="Fiyat" value={k.fiyat} onChange={(e) => kalemGuncelle(k.anahtar, "fiyat", e.target.value)} aria-label="Birim fiyat" />
                 <Secim name="kalem_kdv" value={k.kdv} onChange={(e) => kalemGuncelle(k.anahtar, "kdv", e.target.value)} aria-label="KDV">
-                  {KDV.map((o) => <option key={o} value={o}>%{Number(o) * 100}</option>)}
+                  {secenekli(kdvOranlari, k.kdv).map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
                 </Secim>
                 <span className="self-center text-right text-sm">{tutar ? tl(tutar) : "-"}</span>
                 <Buton type="button" tur="ikincil" onClick={() => setKalemler((l) => l.filter((x) => x.anahtar !== k.anahtar))} disabled={kalemler.length === 1}>Sil</Buton>
@@ -101,7 +102,7 @@ export function HizliSatisFormu({ firmalar, teklif }: { firmalar: { id: number; 
         {h.kalemler && <p className="mt-2 text-xs text-red-600">{h.kalemler}</p>}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <Buton type="button" tur="ikincil" onClick={() => setKalemler((l) => [...l, bosKalem()])}>Satır ekle</Buton>
-          <span className="text-xs text-zinc-500">KDV hariç {tl(hesap.matrah)} · KDV {tl(hesap.kdv)}</span>
+          <span className="text-xs text-zinc-500">Vergiler hariç {tl(hesap.matrah)}{hesap.otv > 0 && ` · ÖTV ${tl(hesap.otv)}`} · KDV {tl(hesap.kdv)}</span>
         </div>
       </Kart>
 

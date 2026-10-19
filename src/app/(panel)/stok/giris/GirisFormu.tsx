@@ -6,6 +6,8 @@ import { UrunSecici, type UrunBulunan } from "@/components/UrunSecici";
 import { BIRIMLER } from "@/lib/dogrulama/urun";
 import { sayi } from "@/lib/normalize";
 import { girisKaydet, xmlOku, type XmlSatir } from "./eylem";
+import { yuzde } from "@/lib/bicim";
+import { secenekli } from "@/lib/vergi";
 
 type Satir = {
   anahtar: number; urun: UrunBulunan | null; yazi: string; tur: string; birim: string; barkod: string; faturaAdi: string; esleme: string; eslesme?: XmlSatir["eslesme"]; miktar: string; fiyat: string; kdv: string;
@@ -13,10 +15,9 @@ type Satir = {
 const bos = (): Satir => ({ anahtar: Date.now() + Math.random(), urun: null, yazi: "", tur: "YEDEK_PARCA", birim: "Adet", barkod: "", faturaAdi: "", esleme: "", miktar: "1", fiyat: "", kdv: "0.2" });
 const virgul = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 4, useGrouping: false });
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
-const KDV = ["0.2", "0.1", "0.01", "0"];
 const ESLESME: Record<string, string> = { kayitli: "önceki eşleme", barkod: "barkoddan", kod: "koddan", ad: "addan" };
 
-export function GirisFormu({ tedarikciler, bugun }: { tedarikciler: { id: number; unvan: string }[]; bugun: string }) {
+export function GirisFormu({ tedarikciler, bugun, kdvOranlari }: { tedarikciler: { id: number; unvan: string }[]; bugun: string; kdvOranlari: string[] }) {
   const [durum, gonder, bekliyor] = useActionState(girisKaydet, undefined);
   const [okunuyor, baslat] = useTransition();
   const [xmlHata, setXmlHata] = useState<string | null>(null);
@@ -120,7 +121,7 @@ export function GirisFormu({ tedarikciler, bugun }: { tedarikciler: { id: number
                 <Girdi name="s_miktar" inputMode="decimal" value={x.miktar} onChange={(e) => guncelle(x.anahtar, { miktar: e.target.value })} aria-label="Miktar" />
                 <Girdi name="s_fiyat" inputMode="decimal" value={x.fiyat} onChange={(e) => guncelle(x.anahtar, { fiyat: e.target.value })} aria-label="Birim fiyat" />
                 <Secim name="s_kdv" value={x.kdv} onChange={(e) => guncelle(x.anahtar, { kdv: e.target.value })} aria-label="KDV">
-                  {KDV.map((o) => <option key={o} value={o}>%{Number(o) * 100}</option>)}
+                  {secenekli(kdvOranlari, x.kdv).map((o) => <option key={o} value={o}>{yuzde(Number(o))}</option>)}
                 </Secim>
                 <span className="self-center text-right text-sm tabular-nums">{hesap[i].t ? tl(hesap[i].t) : "-"}</span>
                 <Buton type="button" tur="ikincil" onClick={() => setSatirlar((l) => l.filter((y) => y.anahtar !== x.anahtar))} disabled={satirlar.length === 1}>Sil</Buton>

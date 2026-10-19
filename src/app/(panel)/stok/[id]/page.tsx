@@ -4,7 +4,7 @@ import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/compon
 import { STOK_HAREKET_AD, URUN_TUR_AD, miktar, tarihSaat, tl, yuzde } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
-import { kritikDurum } from "@/lib/stokHesap";
+import { kritikDurum, fiyattanKarOrani } from "@/lib/stokHesap";
 import { stokDuzelt } from "../eylem";
 import { StokDuzeltFormu } from "./StokDuzeltFormu";
 
@@ -32,7 +32,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
   const m = Number(u.miktar);
   const d = u.tur === "HIZMET" ? null : DURUM[kritikDurum(m, u.kritikStok === null ? null : Number(u.kritikStok))];
   const aylikSatis = -Number(satis90._sum.miktar ?? 0) / 3;
-  const marj = u.satisFiyati && u.ortMaliyet ? (Number(u.satisFiyati) / (1 + Number(u.kdvOrani)) - Number(u.ortMaliyet)) / (Number(u.satisFiyati) / (1 + Number(u.kdvOrani))) : null;
+  const marj = u.satisFiyati ? fiyattanKarOrani(Number(u.satisFiyati), u.ortMaliyet === null ? null : Number(u.ortMaliyet), Number(u.kdvOrani), Number(u.otvOrani)) : null;
 
   const belge = (h: (typeof hareketler)[number]) => {
     if (h.satis) return <Link href={`/satislar/${h.satis.id}`} className="hover:underline">Satış {h.satis.formNo}{h.iade ? ` · iade ${h.iade.iadeNo}` : ""} · {h.satis.cari.unvan}</Link>;
@@ -51,8 +51,12 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
       {p.kayit && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Ürün kartı kaydedildi.</p>}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Bilgi ad="Stoktaki miktar" deger={u.tur === "HIZMET" ? "Stok tutulmaz" : `${miktar(m)} ${u.birim}`} ek={d && <Etiket renk={d[0]}>{d[1]}</Etiket>} />
-        <Bilgi ad="Satış fiyatı (KDV dahil)" deger={tl(u.satisFiyati)} ek={<span className="text-xs text-zinc-500">KDV {yuzde(u.kdvOrani)}</span>} />
-        {maliyet && <Bilgi ad="Ortalama maliyet (KDV hariç)" deger={tl(u.ortMaliyet)} ek={marj !== null && <span className="text-xs text-zinc-500">Satış fiyatında kârlılık {yuzde(marj)}</span>} />}
+        <Bilgi
+          ad="Satış fiyatı (vergiler dahil)"
+          deger={tl(u.satisFiyati)}
+          ek={<span className="text-xs text-zinc-500">KDV {yuzde(u.kdvOrani)}{Number(u.otvOrani) > 0 && ` · ÖTV ${yuzde(u.otvOrani)}`}{maliyet && u.fiyatTipi === "MARJ" && ` · kâr oranı ${yuzde(u.karOrani)}`}</span>}
+        />
+        {maliyet && <Bilgi ad="Ortalama maliyet (KDV hariç)" deger={tl(u.ortMaliyet)} ek={marj !== null && <span className="text-xs text-zinc-500">Maliyet üzerine kâr {yuzde(marj)}</span>} />}
         <Bilgi ad="Aylık ortalama satış" deger={`${miktar(Math.round(aylikSatis * 10) / 10)} ${u.birim}`} ek={<span className="text-xs text-zinc-500">son 90 gün</span>} />
       </div>
       <Kart baslik="Kart bilgileri" className="mb-4">

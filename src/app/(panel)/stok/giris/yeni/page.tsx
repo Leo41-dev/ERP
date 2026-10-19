@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { bugunTr } from "@/lib/dogrulama/teklif";
 import { yetkiIste } from "@/lib/oturum";
 import { GirisFormu } from "../GirisFormu";
+import { kdvOranlari } from "@/lib/vergi";
 
 export const metadata = { title: "Stok girişi" };
 
@@ -12,7 +13,7 @@ export default async function YeniGiris() {
   return (
     <>
       <SayfaBaslik baslik="Stok girişi" aciklama="Tedarikçiden gelen parça ve aksesuarlar. Kaydedince stok artar, ortalama maliyet güncellenir." />
-      <GirisFormu tedarikciler={tedarikciler} bugun={bugunTr()} />
+      <GirisFormu tedarikciler={tedarikciler} bugun={bugunTr()} kdvOranlari={await kdvOranlari(db)} />
     </>
   );
 }

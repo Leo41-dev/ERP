@@ -4,6 +4,7 @@ import { belgeAyarlari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { bugunTr } from "@/lib/dogrulama/teklif";
 import type { ModelSecenek, TeklifBaslangic } from "./TeklifFormu";
+import { kdvOranlari } from "@/lib/vergi";
 
 export const modelEtiket = (m: { marka: { ad: string }; model: string; altModel: string }) => [m.marka.ad, m.model, m.altModel].filter(Boolean).join(" ");
 
@@ -20,6 +21,7 @@ export async function formVerisi() {
   const gun = Math.max(1, Number(ayar["belge.teklifGun"]) || 7);
   const gecerlilik = new Date(Date.parse(bugunTr()) + gun * 86_400_000).toISOString().slice(0, 10);
   return {
+    kdvOranlari: await kdvOranlari(db),
     modeller: modeller.map((m): ModelSecenek => ({
       id: m.id,
       etiket: modelEtiket(m),

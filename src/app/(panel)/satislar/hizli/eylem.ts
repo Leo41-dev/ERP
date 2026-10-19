@@ -19,15 +19,16 @@ export async function hizliSatisKaydet(_: HizliSatisDurum, form: FormData): Prom
   const k = await yetkiIste("SATIS", "MUHASEBE", "SERVIS");
   const { veri: v, hatalar } = hizliSatisDogrula(form);
   if (Object.keys(hatalar).length) return { hatalar };
-  const h = kalemHesapla(v.kalemler);
+  const urunIds = [...new Set(v.kalemler.map((x) => x.urunId).filter((x): x is number => !!x))];
+  const urunler = await db.urun.findMany({ where: { id: { in: urunIds } }, select: { id: true, ad: true, miktar: true, birim: true, tur: true, aktif: true, otvOrani: true } });
+  if (urunler.length !== urunIds.length) return { genel: "Seçilen ürünlerden biri bulunamadı, sayfayı yenileyin." };
+  // ÖTV oranı ürün kartından gelir; serbest yazılan satırda ÖTV yoktur
+  const h = kalemHesapla(v.kalemler.map((x) => ({ ...x, otvOrani: Number(urunler.find((u) => u.id === x.urunId)?.otvOrani ?? 0) })));
   const { fark } = odemeFarki(h.genelToplam, v.odemeler);
   if (Math.abs(fark) >= 0.01 && form.get("farkOnay") !== "1") {
     return { uyari: `Ödemeler toplamdan ${Math.abs(fark).toLocaleString("tr-TR")} ₺ ${fark > 0 ? "eksik" : "fazla"}. Yine de kaydetmek için tekrar Kaydet'e basın.`, onayIste: true, eksiOnay: form.get("eksiOnay") === "1" };
   }
   // stok kartı seçilen satırlar: yetmeyen stok yalnızca yönetici onayıyla eksiye düşer
-  const urunIds = [...new Set(v.kalemler.map((x) => x.urunId).filter((x): x is number => !!x))];
-  const urunler = await db.urun.findMany({ where: { id: { in: urunIds } }, select: { id: true, ad: true, miktar: true, birim: true, tur: true, aktif: true } });
-  if (urunler.length !== urunIds.length) return { genel: "Seçilen ürünlerden biri bulunamadı, sayfayı yenileyin." };
   const yetmeyen = stokYetersiz(
     v.kalemler.filter((x) => x.urunId).map((x) => ({ urunId: x.urunId!, miktar: x.miktar })),
     urunler.map((u) => ({ id: u.id, ad: u.ad, miktar: Number(u.miktar), birim: u.birim, hizmet: u.tur === "HIZMET" })),
@@ -71,14 +72,14 @@ export async function hizliSatisKaydet(_: HizliSatisDurum, form: FormData): Prom
         tarih: new Date(),
         durum: "KAYITLI",
         araToplam: dec(h.matrah),
-        otvToplam: dec(0),
+        otvToplam: dec(h.otv),
         kdvToplam: dec(h.kdv),
         genelToplam: dec(h.genelToplam),
         teslimTarihi: new Date(),
         // perakende satışta yazılan ad fişte görünsün diye nota eklenir
         not: [!m.kimlikNo && !m.telefon && m.unvan ? `Müşteri: ${m.unvan}` : null, v.not].filter(Boolean).join("\n") || null,
         kalemler: {
-          create: h.satirlar.map((x) => ({ urunId: x.urunId ?? null, aciklama: x.aciklama, miktar: dec(x.miktar), birimFiyat: dec(x.birimMatrah), kdvOrani: dec(x.kdvOrani), tutar: dec(x.tutar) })),
+          create: h.satirlar.map((x) => ({ urunId: x.urunId ?? null, aciklama: x.aciklama, miktar: dec(x.miktar), birimFiyat: dec(x.birimMatrah), otvOrani: dec(x.otvOrani), kdvOrani: dec(x.kdvOrani), tutar: dec(x.tutar) })),
         },
       },
       include: { kalemler: { orderBy: { id: "asc" }, select: { id: true, urunId: true, miktar: true } } },

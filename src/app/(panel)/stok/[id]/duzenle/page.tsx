@@ -23,10 +23,11 @@ export default async function UrunDuzenle({ params }: { params: Promise<{ id: st
         eylem={urunKaydet.bind(null, u.id)}
         {...tanim}
         yonetici={k.rol === "YONETICI"}
+        bazMaliyet={u.ortMaliyet === null ? null : Number(u.ortMaliyet)}
         maliyetGoster={maliyetGorur(k)}
         v={{
           ad: u.ad, tur: u.tur, kod: u.kod, barkod: u.barkod ?? undefined, grupId: u.grupId ? String(u.grupId) : undefined, markaId: u.markaId ? String(u.markaId) : undefined, birim: u.birim, raf: u.raf ?? undefined,
-          kritikStok: yaz(u.kritikStok), satisFiyati: yaz(u.satisFiyati), kdvOrani: String(Number(u.kdvOrani)), alisFiyati: yaz(u.alisFiyati), not: u.not ?? undefined, aktif: u.aktif,
+          kritikStok: yaz(u.kritikStok), satisFiyati: yaz(u.satisFiyati), kdvOrani: String(Number(u.kdvOrani)), otvOrani: String(Number(u.otvOrani)), fiyatTipi: u.fiyatTipi, karOrani: u.karOrani === null ? undefined : yaz(Math.round(Number(u.karOrani) * 10000) / 100), alisFiyati: yaz(u.alisFiyati), not: u.not ?? undefined, aktif: u.aktif,
         }}
       />
     </>

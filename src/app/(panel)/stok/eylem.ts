@@ -8,6 +8,7 @@ import { urunDogrula } from "@/lib/dogrulama/urun";
 import { sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
 import { stokHareketYaz, yeniUrunKodu } from "@/lib/stok";
+import { marjliFiyat } from "@/lib/stokHesap";
 
 export type UrunDurum = { hatalar?: Hatalar; genel?: string; tamam?: string } | undefined;
 
@@ -25,22 +26,36 @@ export async function urunKaydet(id: number | null, _: UrunDurum, form: FormData
   }
   if (veri.grupId && !(await db.urunGrubu.findUnique({ where: { id: veri.grupId }, select: { id: true } }))) return { hatalar: { grupId: "Grup bulunamadı." } };
   if (veri.markaId && !(await db.urunMarkasi.findUnique({ where: { id: veri.markaId }, select: { id: true } }))) return { hatalar: { markaId: "Marka bulunamadı." } };
+  const eski = id ? await db.urun.findUnique({ where: { id }, select: { tur: true, miktar: true, alisFiyati: true, ortMaliyet: true, fiyatTipi: true, karOrani: true } }) : null;
   if (id) {
-    const eski = await db.urun.findUnique({ where: { id }, select: { tur: true, miktar: true } });
     if (!eski) return { genel: "Ürün bulunamadı." };
     if (veri.tur === "HIZMET" && eski.tur !== "HIZMET" && Number(eski.miktar) !== 0) return { hatalar: { tur: "Stokta miktarı olan ürün hizmete çevrilemez." } };
   }
+  // kâr oranıyla fiyat: baz son alış fiyatı (formdaki ya da kayıtlı), yoksa ortalama maliyet
+  // fiyat alanlarını görmeyen kullanıcı vergi oranını değiştirirse kayıtlı kâr oranıyla yeniden hesaplanır
+  let satisFiyati = veri.satisFiyati;
+  const tip = veri.fiyatTipi ?? eski?.fiyatTipi ?? "SABIT";
+  const kar = veri.karOrani ?? (eski?.karOrani ? Number(eski.karOrani) : 0);
+  if (tip === "MARJ") {
+    const baz = veri.alisFiyati ?? (eski?.alisFiyati ? Number(eski.alisFiyati) : eski?.ortMaliyet ? Number(eski.ortMaliyet) : null);
+    if (!baz) return { hatalar: { karOrani: "Kâr oranıyla fiyat için alış fiyatı yazılmalı." } };
+    satisFiyati = marjliFiyat(baz, kar, veri.kdvOrani, veri.otvOrani);
+  }
+  const { fiyatTipi, ...kalan } = veri;
   const data = {
-    ...veri,
+    ...kalan,
     kod,
     kdvOrani: new Prisma.Decimal(veri.kdvOrani),
+    otvOrani: new Prisma.Decimal(veri.otvOrani),
     alisFiyati: dec(veri.alisFiyati),
-    satisFiyati: dec(veri.satisFiyati),
+    satisFiyati: dec(satisFiyati),
+    ...(fiyatTipi ? { fiyatTipi, karOrani: dec(veri.karOrani) } : {}),
     kdvDahil: true,
     kritikStok: dec(veri.kritikStok),
   };
-  // alış fiyatını göremeyen kullanıcı kaydettiğinde mevcut değer korunur
+  // alış fiyatını göremeyen kullanıcı kaydettiğinde mevcut değer korunur; kâr oranıyla hesaplanan fiyata dokunamaz
   if (form.get("alisFiyati") === null) delete (data as Partial<typeof data>).alisFiyati;
+  if (tip === "SABIT" && !fiyatTipi && form.get("satisFiyati") === null) delete (data as Partial<typeof data>).satisFiyati;
   const u = await db.$transaction(async (tx) => {
     const u = id ? await tx.urun.update({ where: { id }, data }) : await tx.urun.create({ data });
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: id ? "GUNCELLE" : "EKLE", tablo: "Urun", kayitId: String(u.id) } });

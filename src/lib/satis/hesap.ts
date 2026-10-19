@@ -19,17 +19,17 @@ export function odemeFarki(genelToplam: number, odemeler: OdemeSatiri[]) {
   return { toplam, fark: para(genelToplam - toplam) };
 }
 
-export type KalemGirdisi = { aciklama: string; miktar: number; birimFiyat: number; kdvOrani: number; urunId?: number | null }; // birim fiyat KDV dahil
+export type KalemGirdisi = { aciklama: string; miktar: number; birimFiyat: number; kdvOrani: number; otvOrani?: number; urunId?: number | null }; // birim fiyat vergiler dahil; ÖTV ürün kartından
 
 /** Hızlı satış kalemleri: KDV dahil birim fiyattan satır tutarı, KDV hariç birim fiyat ve KDV */
 export function kalemHesapla(kalemler: KalemGirdisi[]) {
   const satirlar = kalemler.map((k) => {
     const tutar = para(k.miktar * k.birimFiyat);
-    const matrah = para(tutar / (1 + k.kdvOrani));
-    return { ...k, tutar, matrah, kdv: para(tutar - matrah), birimMatrah: para(k.birimFiyat / (1 + k.kdvOrani)) };
+    const otvOrani = k.otvOrani ?? 0;
+    return { ...k, otvOrani, tutar, ...vergiKirilimi(tutar, k.kdvOrani, otvOrani), birimMatrah: para(k.birimFiyat / (1 + k.kdvOrani) / (1 + otvOrani)) };
   });
-  const toplam = (a: "tutar" | "matrah" | "kdv") => para(satirlar.reduce((t, s) => t + s[a], 0));
-  return { satirlar, genelToplam: toplam("tutar"), matrah: toplam("matrah"), kdv: toplam("kdv") };
+  const toplam = (a: "tutar" | "matrah" | "otv" | "kdv") => para(satirlar.reduce((t, s) => t + s[a], 0));
+  return { satirlar, genelToplam: toplam("tutar"), matrah: toplam("matrah"), otv: toplam("otv"), kdv: toplam("kdv") };
 }
 
 export type TeklifKalemGirdisi = { aciklama: string; modelId: number | null; miktar: number; birimFiyat: number; kdvOrani: number; otvOrani: number }; // birim fiyat vergiler dahil

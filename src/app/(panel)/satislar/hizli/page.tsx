@@ -4,6 +4,7 @@ import { ODEME_AD, tarihSaat, tl } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { HizliSatisFormu } from "./HizliSatisFormu";
+import { kdvOranlari } from "@/lib/vergi";
 
 export default async function HizliSatis({ searchParams }: { searchParams: Promise<{ kayit?: string; teklif?: string }> }) {
   const k = await yetkiIste("SATIS", "MUHASEBE", "SERVIS");
@@ -51,7 +52,7 @@ export default async function HizliSatis({ searchParams }: { searchParams: Promi
           </div>
         </Kart>
       )}
-      <HizliSatisFormu key={kayitId ?? teklifId ?? "yeni"} teklif={teklif} firmalar={firmalar} />
+      <HizliSatisFormu key={kayitId ?? teklifId ?? "yeni"} teklif={teklif} firmalar={firmalar} kdvOranlari={await kdvOranlari(db)} />
 
       <h2 className="mb-2 mt-8 text-sm font-semibold">Bugünkü hızlı satışlar · {tl(gunToplam)}</h2>
       <Tablo basliklar={["No", "Saat", "Kalemler", "Ödeme", "Tutar", ""]} bos={!bugun.length}>
