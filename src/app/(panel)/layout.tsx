@@ -1,23 +1,15 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { uygulamaAdi } from "@/lib/belgeAyarlari";
 import { ROL_AD } from "@/lib/bicim";
+import { menuOgeleri } from "@/lib/moduller";
 import { yetkiIste } from "@/lib/oturum";
 import { cikisEylemi } from "./eylem";
 import { Menu } from "./Menu";
+import { SilindiBildirimi } from "./SilindiBildirimi";
 
 export default async function PanelDuzeni({ children }: { children: ReactNode }) {
   const k = await yetkiIste();
-  const ogeler = [
-    { href: "/", ad: "Pano" },
-    { href: "/satislar", ad: "Satışlar" },
-    ...(k.rol !== "DEPO" ? [{ href: "/satislar/hizli", ad: "Hızlı satış" }, { href: "/teklifler", ad: "Teklifler" }] : []),
-    ...(k.rol !== "DEPO" ? [{ href: "/tahsilat", ad: "Tahsilat" }] : []),
-    ...(k.rol === "YONETICI" || k.rol === "MUHASEBE" ? [{ href: "/analiz", ad: "Analiz" }] : []),
-    { href: "/araclar", ad: "Araçlar" },
-    { href: "/stok", ad: "Stok" },
-    { href: "/musteriler", ad: "Müşteriler" },
-    ...(k.rol === "YONETICI" ? [{ href: "/ayarlar", ad: "Ayarlar" }] : []),
-  ];
+  const ogeler = menuOgeleri(k.rol);
   return (
     <div className="min-h-screen bg-zinc-50 md:flex">
       <aside className="border-b border-zinc-200 bg-white p-3 md:min-h-screen md:w-56 md:border-b-0 md:border-r">
@@ -32,7 +24,12 @@ export default async function PanelDuzeni({ children }: { children: ReactNode })
           <button className="text-xs text-zinc-500 hover:text-zinc-900">Çıkış yap</button>
         </form>
       </aside>
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-8">
+        <Suspense>
+          <SilindiBildirimi />
+        </Suspense>
+        {children}
+      </main>
     </div>
   );
 }

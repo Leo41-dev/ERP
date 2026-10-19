@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import type { ReactNode } from "react";
 import { Alan, Girdi, Kart, MetinAlani, Secim } from "@/components/ui";
 import { BELGE_AYARLARI, belgeAyarlari, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
@@ -51,7 +52,7 @@ export function TanimKarti({ tur, baslik, ipucu, liste }: { tur: "urunGrubu" | "
               </AyarFormu>
             </div>
             <span className="w-14 pt-2 text-right text-xs text-zinc-500">{x._count.urunler} ürün</span>
-            <div className="pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, tur, x.id)} /></div>
+            <div className="flex gap-3 pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, tur, x.id)} /><SilButonu kucuk tur={tur} id={x.id} ad={x.ad} /></div>
           </li>
         ))}
         {!liste.length && <li className="text-sm text-zinc-500">Henüz kayıt yok.</li>}
@@ -89,7 +90,7 @@ export function VergiTanimKarti({ liste }: { liste: VergiSatiri[] }) {
               <AyarFormu eylem={vergiTanimKaydet.bind(null, v.id)} buton="Kaydet"><VergiAlanlari v={v} /></AyarFormu>
               <p className="mt-1 text-xs text-zinc-500">{vergiDegerYazi(v.hesap, v.deger)} · {v.kdvMatrahina ? "KDV matrahına girer" : v.kesinti ? "toplama girmez, tahsil edilecekten düşer" : "KDV matrahına girmez, toplama eklenir"}</p>
             </div>
-            <div className="pt-2"><AktiflikButonu aktif={v.aktif} eylem={aktiflikDegistir.bind(null, "vergiTanimi", v.id)} /></div>
+            <div className="flex gap-3 pt-2"><AktiflikButonu aktif={v.aktif} eylem={aktiflikDegistir.bind(null, "vergiTanimi", v.id)} /><SilButonu kucuk tur="vergiTanimi" id={v.id} ad={v.ad} /></div>
           </li>
         ))}
         {!liste.length && <li className="text-sm text-zinc-500">Henüz tanım yok. Örnek: ÖİV (%, KDV matrahına girer), konaklama vergisi (%), maktu vergi (birim başına ₺), KDV tevkifatı (5/10 için 50), stopaj (%, kesinti).</li>}

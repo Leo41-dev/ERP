@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import Link from "next/link";
 import { Girdi, Kart } from "@/components/ui";
 import { yuzde } from "@/lib/bicim";
@@ -20,11 +21,11 @@ export default async function SatisAyarlari() {
       <p className="mb-4 text-sm text-zinc-500">Satış, hızlı satış ve teklif ekranlarında kullanılan oranlar, teslim kontrol listesi ve belge metinleri.</p>
       <div className="grid gap-4 lg:grid-cols-2">
         <Kart baslik="KDV oranları" sag={<span className="text-xs text-zinc-500">Ürün kartı, satış ve teklifte seçilir</span>}>
-          <Liste ogeler={kdvler.map((x) => ({ id: x.id, ad: yuzde(x.oran), aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kdvOrani", x.id)} /> }))} />
+          <Liste ogeler={kdvler.map((x) => ({ id: x.id, ad: yuzde(x.oran), aktif: x.aktif, sag: <span className="flex gap-3"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kdvOrani", x.id)} /><SilButonu kucuk tur="kdvOrani" id={x.id} ad={yuzde(x.oran)} /></span> }))} />
           <AyarFormu eylem={kdvEkle}><Girdi name="oran" placeholder="Oran, % (ör. 20)" inputMode="decimal" className="w-auto flex-1" required /></AyarFormu>
         </Kart>
         <Kart baslik="ÖTV oranları" sag={<span className="text-xs text-zinc-500">Araç satışı ve ürün kartında seçilir</span>}>
-          <Liste ogeler={otvler.map((x) => ({ id: x.id, ad: yuzde(x.oran), aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "otvOrani", x.id)} /> }))} />
+          <Liste ogeler={otvler.map((x) => ({ id: x.id, ad: yuzde(x.oran), aktif: x.aktif, sag: <span className="flex gap-3"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "otvOrani", x.id)} /><SilButonu kucuk tur="otvOrani" id={x.id} ad={yuzde(x.oran)} /></span> }))} />
           <AyarFormu eylem={otvEkle}><Girdi name="oran" placeholder="Oran, % (ör. 37)" inputMode="decimal" className="w-auto flex-1" required /></AyarFormu>
         </Kart>
         <VergiTanimKarti liste={vergiler.map((v) => ({ ...v, deger: Number(v.deger) }))} />
@@ -42,7 +43,7 @@ export default async function SatisAyarlari() {
                     <Girdi name="ad" defaultValue={x.ad} className={`w-auto flex-1 ${x.aktif ? "" : "text-zinc-400 line-through"}`} aria-label="Madde" />
                   </AyarFormu>
                 </div>
-                <div className="pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kontrolMaddesi", x.id)} /></div>
+                <div className="flex gap-3 pt-2"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "kontrolMaddesi", x.id)} /><SilButonu kucuk tur="kontrolMaddesi" id={x.id} ad={x.ad} /></div>
               </li>
             ))}
           </ul>

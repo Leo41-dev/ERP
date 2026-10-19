@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
@@ -48,7 +49,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
       <SayfaBaslik
         baslik={u.ad}
         aciklama={<><span className="font-mono">{u.kod}</span> · {URUN_TUR_AD[u.tur]}{u.grup ? ` · ${u.grup.ad}` : ""}{u.marka ? ` · ${u.marka.ad}` : ""}{!u.aktif && " · pasif"}</>}
-        sag={yonetebilir && <BaglantiButon href={`/stok/${u.id}/duzenle`}>Düzenle</BaglantiButon>}
+        sag={yonetebilir && <div className="flex gap-2"><SilButonu tur="urun" id={u.id} ad={u.ad} /><BaglantiButon href={`/stok/${u.id}/duzenle`}>Düzenle</BaglantiButon></div>}
       />
       {p.kayit && <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-800">Ürün kartı kaydedildi.</p>}
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">

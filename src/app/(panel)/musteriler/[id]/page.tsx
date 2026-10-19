@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
@@ -37,6 +38,7 @@ export default async function MusteriDetay({ params }: { params: Promise<{ id: s
       <SayfaBaslik baslik={c.unvan} aciklama={`Müşteri no ${c.id}`} sag={
           <div className="flex gap-2">
             {tahsilatYetki && <BaglantiButon href={`/tahsilat/yeni?cari=${c.id}`}>Tahsilat al</BaglantiButon>}
+            {(k.rol === "YONETICI" || k.rol === "MUHASEBE") && <SilButonu tur="cari" id={c.id} ad={c.unvan} />}
             <BaglantiButon href={`/musteriler/${c.id}/duzenle`} className="!bg-white !text-zinc-800 border border-zinc-300 hover:!bg-zinc-50">Düzenle</BaglantiButon>
           </div>
         }

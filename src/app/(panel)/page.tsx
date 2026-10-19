@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { panoVerisi } from "@/lib/pano";
 import { kritikStoklar } from "@/lib/stok";
 import { DONEM_AD, donemAraligi, trKunye, type Donem } from "@/lib/panoHesap";
+import { ModulKartlari } from "./ModulKartlari";
 import { Trend } from "./Trend";
 
 const AYLAR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
@@ -69,7 +70,9 @@ export default async function Pano({ searchParams }: { searchParams: Promise<{ d
 
   return (
     <>
-      <SayfaBaslik baslik={satisRolu ? `Merhaba, ${k.adSoyad}` : "Pano"} aciklama={satisRolu ? "Kendi satışlarınız, hedefiniz ve alacaklarınız" : undefined} />
+      <SayfaBaslik baslik={`Merhaba, ${k.adSoyad}`} aciklama="Modüller ve işletmenin özeti" />
+      <ModulKartlari rol={k.rol} />
+      <h2 className="mb-3 text-base font-semibold">{satisRolu ? "Kendi satışlarınız, hedefiniz ve alacaklarınız" : "Pano"}</h2>
 
       <form className="mb-5 flex flex-wrap items-end gap-2">
         <label className="text-xs text-zinc-500">

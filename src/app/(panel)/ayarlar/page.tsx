@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import { Alan, Girdi, Kart, MetinAlani } from "@/components/ui";
 import { db } from "@/lib/db";
 import { firmaKaydet } from "./eylem";
@@ -10,7 +11,7 @@ export default async function GenelAyarlar() {
   const firmalar = await db.firma.findMany({ orderBy: { id: "asc" } });
   return (
     <>
-      <p className="mb-4 text-sm text-zinc-500">Firma bilgileri ve bütün belgelerde ortak olan alanlar. Tanımlar silinmez, pasif yapılır; eski kayıtlar bozulmaz.</p>
+      <p className="mb-4 text-sm text-zinc-500">Firma bilgileri ve bütün belgelerde ortak olan alanlar. Kullanılmayan tanım silinebilir; işlem görmüş olan silinmez, pasif yapılır ki eski kayıtlar bozulmasın.</p>
       <div className="grid gap-4 lg:grid-cols-2">
         <Kart baslik="Firma bilgileri">
           {[...firmalar, null].map((f) => (
@@ -26,6 +27,7 @@ export default async function GenelAyarlar() {
                   <input type="checkbox" name="varsayilan" defaultChecked={f ? f.varsayilan : firmalar.length === 0} /> Satış formunda varsayılan firma
                 </label>
               </AyarFormu>
+              {f && <div className="mt-1 text-right"><SilButonu kucuk tur="firma" id={f.id} ad={f.unvan} /></div>}
             </div>
           ))}
         </Kart>

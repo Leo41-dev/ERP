@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import { Etiket, Girdi, Kart, Secim } from "@/components/ui";
 import { yuzde } from "@/lib/bicim";
 import { db } from "@/lib/db";
@@ -20,12 +21,12 @@ export default async function AracAyarlari() {
       <p className="mb-4 text-sm text-zinc-500">Şase bazlı araç stoğunda kullanılan konumlar, tipler, marka ve modeller.</p>
       <div className="grid gap-4 lg:grid-cols-2">
         <Kart baslik="Araç konumları">
-          <Liste ogeler={konumlar.map((x) => ({ id: x.id, ad: x.ad, aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "konum", x.id)} /> }))} />
+          <Liste ogeler={konumlar.map((x) => ({ id: x.id, ad: x.ad, aktif: x.aktif, sag: <span className="flex gap-3"><AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "konum", x.id)} /><SilButonu kucuk tur="konum" id={x.id} ad={x.ad} /></span> }))} />
           <AyarFormu eylem={konumEkle}><Girdi name="ad" placeholder="Yeni konum" className="w-auto flex-1" required /></AyarFormu>
         </Kart>
 
         <Kart baslik="Araç tipleri">
-          <Liste ogeler={tipler.map((x) => ({ id: x.id, ad: x.ad, sag: <span className="text-xs text-zinc-500">önerilen ÖTV {yuzde(x.varsayilanOtvOrani)}</span> }))} />
+          <Liste ogeler={tipler.map((x) => ({ id: x.id, ad: x.ad, sag: <span className="flex gap-3 text-xs text-zinc-500">önerilen ÖTV {yuzde(x.varsayilanOtvOrani)}<SilButonu kucuk tur="aracTipi" id={x.id} ad={x.ad} /></span> }))} />
           <AyarFormu eylem={tipEkle}>
             <Girdi name="ad" placeholder="Tip (ör. SUV, ATV)" className="w-auto flex-1" required />
             <Secim name="otv" className="w-auto" defaultValue="">
@@ -39,10 +40,10 @@ export default async function AracAyarlari() {
           <div className="mb-4 space-y-3">
             {markalar.map((m) => (
               <div key={m.id}>
-                <p className="text-sm font-medium">{m.ad}</p>
+                <div className="flex items-center gap-3 text-sm font-medium">{m.ad}<SilButonu kucuk tur="marka" id={m.id} ad={m.ad} /></div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {m.modeller.map((x) => (
-                    <Etiket key={x.id}>{[x.model, x.altModel].filter(Boolean).join(" · ")}{x.tip ? ` (${x.tip.ad})` : ""}</Etiket>
+                    <Etiket key={x.id}>{[x.model, x.altModel].filter(Boolean).join(" · ")}{x.tip ? ` (${x.tip.ad})` : ""} <SilButonu kucuk tur="aracModeli" id={x.id} ad={[m.ad, x.model, x.altModel].filter(Boolean).join(" ")} /></Etiket>
                   ))}
                   {!m.modeller.length && <span className="text-xs text-zinc-500">Model yok.</span>}
                 </div>

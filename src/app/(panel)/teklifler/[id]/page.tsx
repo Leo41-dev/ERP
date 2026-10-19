@@ -1,3 +1,4 @@
+import { SilButonu } from "@/components/SilButonu";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BaglantiButon, Etiket, Hucre, Kart, SayfaBaslik, Tablo } from "@/components/ui";
@@ -43,6 +44,7 @@ export default async function TeklifDetay({ params }: { params: Promise<{ id: st
             <BaglantiButon href={`/yazdir/teklif/${t.id}`} target="_blank" className={ikincil}>Yazdır / PDF</BaglantiButon>
             {whatsapp && <BaglantiButon href={whatsapp} target="_blank" className={ikincil}>WhatsApp ile gönder</BaglantiButon>}
             <BaglantiButon href={`/teklifler/yeni?kopya=${t.id}`} className={ikincil}>Kopyala</BaglantiButon>
+            {!t.satisId && k.rol !== "SERVIS" && k.rol !== "DEPO" && <SilButonu tur="teklif" id={t.id} ad={`Teklif ${t.teklifNo}`} />}
             {acik && <BaglantiButon href={`/teklifler/${t.id}/duzenle`} className={ikincil}>Düzenle</BaglantiButon>}
             {acik && k.rol !== "SERVIS" && (
               <BaglantiButon href={aracli ? `/satislar/yeni?teklif=${t.id}` : `/satislar/hizli?teklif=${t.id}`}>Satışa dönüştür</BaglantiButon>
