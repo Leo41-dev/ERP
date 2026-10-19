@@ -10,6 +10,7 @@ import { kalemHesapla, odemeFarki } from "@/lib/satis/hesap";
 import { stokHareketYaz } from "@/lib/stok";
 import { stokYetersiz } from "@/lib/stokHesap";
 import { URUN_VERGILERI, ekVergi } from "@/lib/urunVergi";
+import { tahsilatHesabaYaz } from "@/lib/finans";
 
 export type HizliSatisDurum = { hatalar?: Hatalar; genel?: string; uyari?: string; onayIste?: boolean; eksiUyari?: string; eksiOnay?: boolean } | undefined;
 
@@ -110,6 +111,7 @@ export async function hizliSatisKaydet(_: HizliSatisDurum, form: FormData): Prom
     for (const o of v.odemeler) {
       const t = await tx.tahsilat.create({ data: { cariId: cari.id, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: o.aciklama, kaydeden: k.adSoyad } });
       await tx.cariHareket.create({ data: { cariId: cari.id, tarih: t.tarih, alacak: dec(o.tutar), aciklama: `Tahsilat (satış ${s.formNo})`, satisId: s.id, tahsilatId: t.id } });
+      await tahsilatHesabaYaz(tx, t, o.hesapId, k.adSoyad, `Hızlı satış ${s.formNo}`);
     }
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "HIZLI_SATIS", tablo: "Satis", kayitId: String(s.id), detay: { formNo: s.formNo, tutar: h.genelToplam } } });
     return s.id;

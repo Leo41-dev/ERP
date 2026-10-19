@@ -5,6 +5,7 @@ import { yetkiIste } from "@/lib/oturum";
 import { satisKalani } from "@/lib/satis/iade";
 import { iadeKaydet } from "./eylem";
 import { IadeFormu } from "./IadeFormu";
+import { odemeHesapSecenekleri } from "@/lib/finans";
 
 export default async function IadeAl({ params }: { params: Promise<{ id: string }> }) {
   const k = await yetkiIste("SATIS", "MUHASEBE");
@@ -23,7 +24,7 @@ export default async function IadeAl({ params }: { params: Promise<{ id: string 
   return (
     <>
       <SayfaBaslik baslik={`Satış ${s.formNo} · iade`} aciklama={`${s.cari.unvan} · kayıt silinmez; iade cariye alacak, geri ödeme borç olarak yazılır.`} />
-      <IadeFormu
+      <IadeFormu hesaplar={await odemeHesapSecenekleri()}
         eylem={iadeKaydet.bind(null, s.id)}
         alinan={Math.round((tahsil - geri) * 100) / 100}
         acik={satisKalani({ genelToplam: Number(s.genelToplam), iade, tahsil, geriOdeme: geri, kesinti: Number(s.kesintiToplam) })}

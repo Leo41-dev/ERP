@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { SatisFormu } from "../SatisFormu";
 import { kdvOranlari } from "@/lib/vergi";
+import { odemeHesapSecenekleri } from "@/lib/finans";
 
 export default async function YeniSatis({ searchParams }: { searchParams: Promise<{ arac?: string; teklif?: string }> }) {
   const k = await yetkiIste("SATIS");
@@ -37,7 +38,7 @@ export default async function YeniSatis({ searchParams }: { searchParams: Promis
   return (
     <>
       <SayfaBaslik baslik="Yeni satış" aciklama={teklif ? `${teklif.no} numaralı tekliften` : "Satış kaydedilince araç rezerve olur; fatura kesilince satıldıya geçer."} />
-      <SatisFormu
+      <SatisFormu hesaplar={await odemeHesapSecenekleri()}
         secili={secili}
         teklif={teklif}
         otvOranlari={otvOranlari.map((o) => Number(o.oran))}

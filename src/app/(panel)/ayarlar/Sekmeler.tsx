@@ -8,6 +8,7 @@ export const AYAR_BOLUMLERI = [
   { href: "/ayarlar/satis", ad: "Satış", yollar: ["/ayarlar/satis", "/ayarlar/hedefler"] },
   { href: "/ayarlar/stok", ad: "Stok", yollar: ["/ayarlar/stok"] },
   { href: "/ayarlar/araclar", ad: "Araçlar", yollar: ["/ayarlar/araclar"] },
+  { href: "/ayarlar/finans", ad: "Finans", yollar: ["/ayarlar/finans"] },
   { href: "/ayarlar/kullanicilar", ad: "Kullanıcılar", yollar: ["/ayarlar/kullanicilar"] },
 ];
 

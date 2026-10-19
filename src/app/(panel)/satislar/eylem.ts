@@ -8,6 +8,7 @@ import { satisDogrula } from "@/lib/dogrulama/satis";
 import { yetkiIste, type OturumKullanici } from "@/lib/oturum";
 import { odemeFarki, vergiKirilimi } from "@/lib/satis/hesap";
 import { satisStoguGeriAl } from "@/lib/stok";
+import { tahsilatHareketleriniIptalEt, tahsilatHesabaYaz } from "@/lib/finans";
 
 export type SatisDurum = { hatalar?: Hatalar; genel?: string; uyari?: string; onayIste?: boolean } | undefined;
 
@@ -115,6 +116,7 @@ async function satisOlustur(k: OturumKullanici, m: ReturnType<typeof cariDogrula
         data: { cariId, satisId: s.id, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: o.aciklama, kaydeden: k.adSoyad },
       });
       await tx.cariHareket.create({ data: { cariId, tarih: t.tarih, alacak: dec(o.tutar), aciklama: `Tahsilat (satış ${s.formNo})`, satisId: s.id, tahsilatId: t.id } });
+      await tahsilatHesabaYaz(tx, t, o.hesapId, k.adSoyad, `Tahsilat, satış ${s.formNo}`);
     }
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "SATIS", tablo: "Satis", kayitId: String(s.id), detay: { formNo: s.formNo, sase: arac.sase, tutar: v.genelToplam } } });
     return s.id;
@@ -140,6 +142,9 @@ export async function satisIptal(id: number, _: SatisDurum, form: FormData): Pro
     const aracIdler = s.kalemler.map((x) => x.aracId).filter((x): x is number => x !== null);
     await tx.arac.updateMany({ where: { id: { in: aracIdler }, durum: "REZERVE" }, data: { durum: "STOKTA" } });
     await satisStoguGeriAl(tx, id, k.adSoyad);
+    // alınan ödemeler müşteriye döner: hesap hareketleri iptal edilir
+    const tahsilatlar = await tx.tahsilat.findMany({ where: { satisId: id }, select: { id: true } });
+    await tahsilatHareketleriniIptalEt(tx, tahsilatlar.map((x) => x.id), k.adSoyad, `Satış ${s.formNo} iptali: ${neden}`);
     // cari hareketleri silinmez; ters kayıtla kapatılır
     const hareketler = await tx.cariHareket.findMany({ where: { satisId: id } });
     const borc = hareketler.reduce((t, h) => t + Number(h.borc), 0);

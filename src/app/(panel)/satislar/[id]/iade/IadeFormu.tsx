@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { sifirlamadan } from "@/components/form";
+import type { OdemeHesaplari } from "@/lib/finans";
 import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { Alan, Buton, Girdi, HataKutusu, Kart } from "@/components/ui";
 import { sayi } from "@/lib/normalize";
@@ -11,7 +12,7 @@ const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currenc
 const virgul = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 
 /** alinan: müşteriden net alınan para (tahsilat − önceki geri ödemeler); acik: iade öncesi kalan alacak */
-export function IadeFormu({ eylem, kalemler, alinan, acik, tescilli }: { eylem: (d: IadeDurumu, f: FormData) => Promise<IadeDurumu>; kalemler: IadeKalem[]; alinan: number; acik: number; tescilli: boolean }) {
+export function IadeFormu({ eylem, kalemler, alinan, acik, tescilli, hesaplar }: { hesaplar?: OdemeHesaplari; eylem: (d: IadeDurumu, f: FormData) => Promise<IadeDurumu>; kalemler: IadeKalem[]; alinan: number; acik: number; tescilli: boolean }) {
   const [durum, gonder, bekliyor] = useActionState(eylem, undefined);
   const h = durum?.hatalar ?? {};
   const tekAracli = kalemler.length === 1 && kalemler[0].arac;
@@ -74,7 +75,7 @@ export function IadeFormu({ eylem, kalemler, alinan, acik, tescilli }: { eylem: 
       </Kart>
 
       <Kart baslik="Müşteriye geri ödeme" sag={<span className="text-sm text-zinc-600">{tl(geriToplam)} · alınan {tl(alinan)}</span>}>
-        <OdemeSatirlari
+        <OdemeSatirlari hesaplar={hesaplar}
           odemeler={liste}
           guncelle={(a, alan, d) => setOdemeler(liste.map((o) => (o.anahtar === a ? { ...o, [alan]: d } : o)))}
           sil={(a) => setOdemeler(liste.filter((o) => o.anahtar !== a))}

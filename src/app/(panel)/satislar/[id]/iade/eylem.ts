@@ -9,6 +9,7 @@ import { para, sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
 import { iadeCariTutari, iadeKalemleri, satisKalani } from "@/lib/satis/iade";
 import { stokHareketYaz } from "@/lib/stok";
+import { geriOdemeHesabaYaz } from "@/lib/finans";
 
 export type IadeDurumu = { hatalar?: Hatalar; genel?: string } | undefined;
 
@@ -70,6 +71,7 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
     for (const g of geriOdemeler) {
       const go = await tx.geriOdeme.create({ data: { iadeId: iade.id, yontem: g.yontem, tutar: dec(g.tutar), aciklama: g.aciklama } });
       await tx.cariHareket.create({ data: { cariId: s.cariId, tarih: iade.tarih, borc: dec(g.tutar), aciklama: `İade ödemesi ${iade.iadeNo} (satış ${s.formNo})`, satisId, iadeId: iade.id, geriOdemeId: go.id } });
+      await geriOdemeHesabaYaz(tx, { ...go, tutar: g.tutar, cariId: s.cariId, tarih: iade.tarih }, g.hesapId, k.adSoyad, `İade ödemesi ${iade.iadeNo}, satış ${s.formNo}`);
     }
     // iade edilen araç stoğa döner; tescilli/kullanılmış araç 2. el olarak alınabilir
     if (aracIdler.length) {

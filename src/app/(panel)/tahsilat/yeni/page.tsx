@@ -5,6 +5,7 @@ import { acikSatislar, cariBakiye } from "@/lib/cari";
 import { db } from "@/lib/db";
 import { yetkiIste } from "@/lib/oturum";
 import { TahsilatFormu } from "./TahsilatFormu";
+import { odemeHesapSecenekleri } from "@/lib/finans";
 
 export default async function YeniTahsilat({ searchParams }: { searchParams: Promise<{ cari?: string; satis?: string; q?: string }> }) {
   await yetkiIste("SATIS", "MUHASEBE", "SERVIS");
@@ -50,7 +51,7 @@ export default async function YeniTahsilat({ searchParams }: { searchParams: Pro
     <>
       <SayfaBaslik baslik="Tahsilat al" aciklama={<><Link href={`/musteriler/${cari.id}`} className="hover:underline">{cari.unvan}</Link> · bakiye {tl(bakiye.bakiye)}</>} />
       {!acik.length && <Kart className="mb-4"><p className="text-sm text-zinc-600">Bu müşterinin ödemesi kalan satışı yok. Kapora ya da genel tahsilat girebilirsiniz.</p></Kart>}
-      <TahsilatFormu
+      <TahsilatFormu hesaplar={await odemeHesapSecenekleri()}
         cariId={cari.id}
         secili={satisId}
         bugun={new Date().toISOString().slice(0, 10)}

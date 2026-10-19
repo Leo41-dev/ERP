@@ -2,6 +2,7 @@
 import { sifirlamadan } from "@/components/form";
 import { useActionState, useMemo, useRef, useState } from "react";
 import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/components/ui";
+import type { OdemeHesaplari } from "@/lib/finans";
 import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { sayi } from "@/lib/normalize";
 import { vergiKirilimi } from "@/lib/satis/hesap";
@@ -16,7 +17,7 @@ export type TekliftenSatis = {
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 const yuzde = (o: number) => `%${(o * 100).toLocaleString("tr-TR", { maximumFractionDigits: 2 })}`;
 
-export function SatisFormu({ araclar, secili, otvOranlari, kdvOranlari, teklif }: { araclar: Arac[]; secili?: number; otvOranlari: number[]; kdvOranlari: string[]; teklif?: TekliftenSatis }) {
+export function SatisFormu({ araclar, secili, otvOranlari, kdvOranlari, teklif, hesaplar }: { hesaplar?: OdemeHesaplari; araclar: Arac[]; secili?: number; otvOranlari: number[]; kdvOranlari: string[]; teklif?: TekliftenSatis }) {
   const [durum, gonder, bekliyor] = useActionState(satisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const ilk = araclar.find((a) => a.id === secili);
@@ -139,7 +140,7 @@ export function SatisFormu({ araclar, secili, otvOranlari, kdvOranlari, teklif }
       </Kart>
 
       <Kart baslik="Ödemeler" sag={<span className={`text-sm ${genel && Math.abs(genel - odemeToplam) >= 0.5 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(genel)}</span>}>
-        <OdemeSatirlari odemeler={odemeler} guncelle={odemeGuncelle} sil={(a) => setOdemeler((l) => l.filter((x) => x.anahtar !== a))} />
+        <OdemeSatirlari hesaplar={hesaplar} odemeler={odemeler} guncelle={odemeGuncelle} sil={(a) => setOdemeler((l) => l.filter((x) => x.anahtar !== a))} />
         {h.odemeler && <p className="mt-2 text-xs text-red-600">{h.odemeler}</p>}
         <Buton type="button" tur="ikincil" className="mt-3" onClick={() => setOdemeler((l) => [...l, yeniOdeme()])}>
           Ödeme satırı ekle

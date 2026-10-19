@@ -1,5 +1,5 @@
 "use server";
-import { Prisma, type Rol } from "@prisma/client";
+import { Prisma, type KategoriTur, type OdemeYontem, type Rol } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { BELGE_AYARLARI, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
@@ -263,11 +263,14 @@ export async function urunTanimAdDegistir(tur: UrunTanim, id: number, _: AyarDur
 }
 
 /** Konum, ÖTV oranı, kontrol maddesi, ürün grubu ve markası silinmez; pasif yapılır ki eski kayıtlar bozulmasın. */
-export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kdvOrani" | "vergiTanimi" | "kontrolMaddesi" | UrunTanim, id: number) {
+export async function aktiflikDegistir(tablo: "finansKategori" | "konum" | "otvOrani" | "kdvOrani" | "vergiTanimi" | "kontrolMaddesi" | UrunTanim, id: number) {
   const k = await yetkiIste("YONETICI");
   const where = { id };
   let aktif: boolean | undefined;
-  if (tablo === "konum") {
+  if (tablo === "finansKategori") {
+    aktif = (await db.finansKategori.findUnique({ where }))?.aktif;
+    if (aktif !== undefined) await db.finansKategori.update({ where, data: { aktif: !aktif } });
+  } else if (tablo === "konum") {
     aktif = (await db.konum.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.konum.update({ where, data: { aktif: !aktif } });
   } else if (tablo === "otvOrani") {
@@ -324,4 +327,35 @@ export async function maddeGuncelle(id: number, _: AyarDurum, f: FormData): Prom
   await denetim(k.kullaniciAdi, "GUNCELLE", "KontrolMaddesi", id);
   revalidatePath("/ayarlar", "layout");
   return { tamam: "Kaydedildi." };
+}
+
+/* ---------- finans ---------- */
+
+/** Ödeme yöntemine göre paranın gireceği varsayılan hesap (boş: hesaba işlenmez) */
+export async function finansVarsayilanKaydet(_: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const yontemler: OdemeYontem[] = ["NAKIT", "KART", "HAVALE", "CEK", "SENET", "DIGER"];
+  await db.$transaction(
+    yontemler.map((y) => {
+      const deger = String(Number(f.get(y)) || "");
+      return db.ayar.upsert({ where: { anahtar: `finans.hesap.${y}` }, create: { anahtar: `finans.hesap.${y}`, deger, guncelleme: new Date() }, update: { deger, guncelleme: new Date() } });
+    }),
+  );
+  await denetim(k.kullaniciAdi, "GUNCELLE", "Ayar", "finans.hesap");
+  revalidatePath("/ayarlar", "layout");
+  return { tamam: "Kaydedildi." };
+}
+
+export async function finansKategoriEkle(tur: KategoriTur, _: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const ad = yazi(f, "ad");
+  if (!ad) return { hata: "Ad boş olamaz." };
+  try {
+    const x = await db.finansKategori.create({ data: { ad, tur } });
+    await denetim(k.kullaniciAdi, "EKLE", "FinansKategori", x.id);
+  } catch (e) {
+    return benzersiz(e, "Bu kategori zaten var.");
+  }
+  revalidatePath("/ayarlar", "layout");
+  return { tamam: "Eklendi." };
 }

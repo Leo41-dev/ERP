@@ -36,6 +36,8 @@ export const SILINEBILIR = {
       return null;
     },
   },
+  finansHesabi: { model: "FinansHesabi", ad: "hesap", yetki: ["MUHASEBE"], liste: "/finans" },
+  finansKategori: { model: "FinansKategori", ad: "kategori", yetki: [] },
   konum: { model: "Konum", ad: "konum", yetki: [] },
   kdvOrani: { model: "KdvOrani", ad: "KDV oranı", yetki: [] },
   otvOrani: { model: "OtvOrani", ad: "ÖTV oranı", yetki: [] },
@@ -92,6 +94,8 @@ const MODEL_AD: Partial<Record<Prisma.ModelName, string>> = {
   UrunVergi: "ürün kartı",
   FaturaEsleme: "fatura eşlemesi",
   SatisHedefi: "satış hedefi",
+  HesapHareketi: "hesap hareketi",
+  GeriOdeme: "iade ödemesi",
 };
 
 type Delege = { count(a: object): Promise<number>; deleteMany(a: object): Promise<unknown>; findUnique(a: object): Promise<object | null>; delete(a: object): Promise<unknown> };

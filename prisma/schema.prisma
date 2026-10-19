@@ -122,6 +122,26 @@ enum TeklifDurum {
   RET
 }
 
+enum HesapTur {
+  KASA
+  BANKA
+  POS
+  KREDI_KARTI
+}
+
+enum HareketKaynak {
+  MANUEL
+  TAHSILAT
+  GERI_ODEME
+  VIRMAN
+  ENTEGRASYON
+}
+
+enum KategoriTur {
+  GELIR
+  GIDER
+}
+
 enum OdemeYontem {
   HAVALE
   KART
@@ -134,15 +154,16 @@ enum OdemeYontem {
 // ---------------------------------------------------------------- tanımlar
 
 model Firma {
-  id           Int      @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   unvan        String
-  vkn          String   @unique
+  vkn          String         @unique
   vergiDairesi String?
   adres        String?
-  varsayilan   Boolean  @default(false)
-  aktif        Boolean  @default(true)
+  varsayilan   Boolean        @default(false)
+  aktif        Boolean        @default(true)
   satislar     Satis[]
   teklifler    Teklif[]
+  hesaplar     FinansHesabi[]
 }
 
 model Kullanici {
@@ -282,32 +303,33 @@ model KontrolMaddesi {
 // ---------------------------------------------------------------- cari
 
 model Cari {
-  id            Int           @id @default(autoincrement())
-  tip           CariTip       @default(BIREYSEL)
-  rol           CariRol       @default(MUSTERI)
-  unvan         String
-  tckn          String?
-  vkn           String?
-  vergiDairesi  String?
-  tckkSeriNo    String?
-  dogumTarihi   DateTime?     @db.Date
-  telefon       String? // 10 hane, başında 0 olmadan
-  telefon2      String?
-  eposta        String?
-  il            String?
-  ilce          String?
-  acikAdres     String?
-  eTebligat     Boolean       @default(false)
-  kvkkOnay      Boolean       @default(false)
-  not           String?
-  olusturma     DateTime      @default(now())
-  satislar      Satis[]
-  teklifler     Teklif[]
-  tahsilatlar   Tahsilat[]
-  hareketler    CariHareket[]
-  garantiler    Garanti[]
-  tedarikEdilen Arac[]        @relation("Tedarikci")
-  stokGirisleri StokGiris[]   @relation("StokGirisTedarikci")
+  id               Int             @id @default(autoincrement())
+  tip              CariTip         @default(BIREYSEL)
+  rol              CariRol         @default(MUSTERI)
+  unvan            String
+  tckn             String?
+  vkn              String?
+  vergiDairesi     String?
+  tckkSeriNo       String?
+  dogumTarihi      DateTime?       @db.Date
+  telefon          String? // 10 hane, başında 0 olmadan
+  telefon2         String?
+  eposta           String?
+  il               String?
+  ilce             String?
+  acikAdres        String?
+  eTebligat        Boolean         @default(false)
+  kvkkOnay         Boolean         @default(false)
+  not              String?
+  olusturma        DateTime        @default(now())
+  satislar         Satis[]
+  teklifler        Teklif[]
+  tahsilatlar      Tahsilat[]
+  hareketler       CariHareket[]
+  garantiler       Garanti[]
+  tedarikEdilen    Arac[]          @relation("Tedarikci")
+  hesapHareketleri HesapHareketi[]
+  stokGirisleri    StokGiris[]     @relation("StokGirisTedarikci")
 
   @@index([tckn])
   @@index([vkn])
@@ -316,21 +338,23 @@ model Cari {
 }
 
 model CariHareket {
-  id          Int        @id @default(autoincrement())
-  cariId      Int
-  cari        Cari       @relation(fields: [cariId], references: [id])
-  tarih       DateTime
-  borc        Decimal    @default(0) @db.Decimal(14, 2)
-  alacak      Decimal    @default(0) @db.Decimal(14, 2)
-  aciklama    String?
-  satisId     Int?
-  satis       Satis?     @relation(fields: [satisId], references: [id])
-  tahsilatId  Int?       @unique
-  tahsilat    Tahsilat?  @relation(fields: [tahsilatId], references: [id])
-  iadeId      Int?
-  iade        Iade?      @relation(fields: [iadeId], references: [id])
-  geriOdemeId Int?       @unique
-  geriOdeme   GeriOdeme? @relation(fields: [geriOdemeId], references: [id])
+  id              Int            @id @default(autoincrement())
+  cariId          Int
+  cari            Cari           @relation(fields: [cariId], references: [id])
+  tarih           DateTime
+  borc            Decimal        @default(0) @db.Decimal(14, 2)
+  alacak          Decimal        @default(0) @db.Decimal(14, 2)
+  aciklama        String?
+  satisId         Int?
+  satis           Satis?         @relation(fields: [satisId], references: [id])
+  tahsilatId      Int?           @unique
+  tahsilat        Tahsilat?      @relation(fields: [tahsilatId], references: [id])
+  iadeId          Int?
+  iade            Iade?          @relation(fields: [iadeId], references: [id])
+  geriOdemeId     Int?           @unique
+  geriOdeme       GeriOdeme?     @relation(fields: [geriOdemeId], references: [id])
+  hesapHareketiId Int?           @unique // banka/kasa ekranından cariye bağlı girilen hareket
+  hesapHareketi   HesapHareketi? @relation(fields: [hesapHareketiId], references: [id])
 
   @@index([cariId, tarih])
 }
@@ -591,20 +615,20 @@ model Satis {
 }
 
 model SatisKalemi {
-  id           Int          @id @default(autoincrement())
+  id           Int                @id @default(autoincrement())
   satisId      Int
-  satis        Satis        @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  satis        Satis              @relation(fields: [satisId], references: [id], onDelete: Cascade)
   urunId       Int?
-  urun         Urun?        @relation(fields: [urunId], references: [id])
+  urun         Urun?              @relation(fields: [urunId], references: [id])
   aracId       Int?
-  arac         Arac?        @relation(fields: [aracId], references: [id])
+  arac         Arac?              @relation(fields: [aracId], references: [id])
   aciklama     String
-  miktar       Decimal      @default(1) @db.Decimal(14, 3)
-  birimFiyat   Decimal      @db.Decimal(14, 2) // vergiler hariç
-  iskontoOrani Decimal      @default(0) @db.Decimal(6, 4)
-  otvOrani     Decimal      @default(0) @db.Decimal(6, 4)
-  kdvOrani     Decimal      @default(0.2) @db.Decimal(6, 4)
-  tutar        Decimal      @db.Decimal(14, 2) // vergiler dahil satır toplamı
+  miktar       Decimal            @default(1) @db.Decimal(14, 3)
+  birimFiyat   Decimal            @db.Decimal(14, 2) // vergiler hariç
+  iskontoOrani Decimal            @default(0) @db.Decimal(6, 4)
+  otvOrani     Decimal            @default(0) @db.Decimal(6, 4)
+  kdvOrani     Decimal            @default(0.2) @db.Decimal(6, 4)
+  tutar        Decimal            @db.Decimal(14, 2) // vergiler dahil satır toplamı
   iadeler      IadeKalemi[]
   vergiler     SatisKalemiVergi[]
 }
@@ -642,33 +666,39 @@ model IadeKalemi {
 
 /// İade nedeniyle müşteriye ödenen para
 model GeriOdeme {
-  id          Int          @id @default(autoincrement())
-  iadeId      Int
-  iade        Iade         @relation(fields: [iadeId], references: [id], onDelete: Cascade)
-  yontem      OdemeYontem
-  tutar       Decimal      @db.Decimal(14, 2)
-  aciklama    String?
-  cariHareket CariHareket?
+  id            Int            @id @default(autoincrement())
+  iadeId        Int
+  iade          Iade           @relation(fields: [iadeId], references: [id], onDelete: Cascade)
+  yontem        OdemeYontem
+  tutar         Decimal        @db.Decimal(14, 2)
+  aciklama      String?
+  cariHareket   CariHareket?
+  hesapId       Int?
+  hesap         FinansHesabi?  @relation(fields: [hesapId], references: [id])
+  hesapHareketi HesapHareketi?
 }
 
 model Tahsilat {
-  id           Int          @id @default(autoincrement())
-  cariId       Int
-  cari         Cari         @relation(fields: [cariId], references: [id])
-  satisId      Int?
-  satis        Satis?       @relation(fields: [satisId], references: [id])
-  tarih        DateTime     @default(now())
-  yontem       OdemeYontem
-  tutar        Decimal      @db.Decimal(14, 2)
-  taksit       Int?
-  vade         DateTime?    @db.Date // senet / çek vadesi
-  tahsilTarihi DateTime?    @db.Date // senet / çek tahsil edildiğinde
-  aciklama     String?
-  kaydeden     String?
-  iptalNedeni  String?
-  iptalEden    String?
-  iptalZamani  DateTime? // iptal edilen tahsilat silinmez, cariye ters kayıt atılır
-  cariHareket  CariHareket?
+  id            Int            @id @default(autoincrement())
+  cariId        Int
+  cari          Cari           @relation(fields: [cariId], references: [id])
+  satisId       Int?
+  satis         Satis?         @relation(fields: [satisId], references: [id])
+  tarih         DateTime       @default(now())
+  yontem        OdemeYontem
+  tutar         Decimal        @db.Decimal(14, 2)
+  taksit        Int?
+  vade          DateTime?      @db.Date // senet / çek vadesi
+  tahsilTarihi  DateTime?      @db.Date // senet / çek tahsil edildiğinde
+  aciklama      String?
+  kaydeden      String?
+  iptalNedeni   String?
+  iptalEden     String?
+  iptalZamani   DateTime? // iptal edilen tahsilat silinmez, cariye ters kayıt atılır
+  cariHareket   CariHareket?
+  hesapId       Int? // paranın girdiği kasa / banka / POS hesabı (senet ve çekte tahsil edildiğinde)
+  hesap         FinansHesabi?  @relation(fields: [hesapId], references: [id])
+  hesapHareketi HesapHareketi?
 
   @@index([yontem, vade])
 }
@@ -778,4 +808,70 @@ model FaturaEsleme {
   modelId    Int
   model      AracModeli @relation(fields: [modelId], references: [id])
   guncelleme DateTime   @updatedAt
+}
+
+// ---------------------------------------------------------------- banka ve kasa
+
+// Kasa, banka hesabı, POS ve kredi kartı. Bakiye: açılış + girişler − çıkışlar (iptal edilenler hariç).
+model FinansHesabi {
+  id           Int             @id @default(autoincrement())
+  ad           String          @unique
+  tur          HesapTur
+  firmaId      Int?
+  firma        Firma?          @relation(fields: [firmaId], references: [id])
+  banka        String?
+  sube         String?
+  hesapNo      String?
+  iban         String?
+  paraBirimi   ParaBirimi      @default(TRY)
+  acilisBakiye Decimal         @default(0) @db.Decimal(14, 2)
+  acilisTarihi DateTime        @db.Date
+  aciklama     String?
+  aktif        Boolean         @default(true)
+  olusturma    DateTime        @default(now())
+  hareketler   HesapHareketi[]
+  tahsilatlar  Tahsilat[]
+  geriOdemeler GeriOdeme[]
+}
+
+model FinansKategori {
+  id         Int             @id @default(autoincrement())
+  ad         String
+  tur        KategoriTur
+  aktif      Boolean         @default(true)
+  hareketler HesapHareketi[]
+
+  @@unique([tur, ad])
+}
+
+// Hesap hareketi silinmez, iptal edilir. Entegrasyonla gelen satırlar disReferans ile tekilleşir.
+model HesapHareketi {
+  id          Int             @id @default(autoincrement())
+  hesapId     Int
+  hesap       FinansHesabi    @relation(fields: [hesapId], references: [id])
+  tarih       DateTime
+  giris       Decimal         @default(0) @db.Decimal(14, 2)
+  cikis       Decimal         @default(0) @db.Decimal(14, 2)
+  aciklama    String?
+  belgeNo     String?
+  kategoriId  Int?
+  kategori    FinansKategori? @relation(fields: [kategoriId], references: [id])
+  cariId      Int?
+  cari        Cari?           @relation(fields: [cariId], references: [id])
+  tahsilatId  Int?            @unique
+  tahsilat    Tahsilat?       @relation(fields: [tahsilatId], references: [id])
+  geriOdemeId Int?            @unique
+  geriOdeme   GeriOdeme?      @relation(fields: [geriOdemeId], references: [id])
+  virmanNo    String? // aynı virmanın iki bacağı
+  kaynak      HareketKaynak   @default(MANUEL)
+  disReferans String?
+  kaydeden    String?
+  olusturma   DateTime        @default(now())
+  iptalZamani DateTime?
+  iptalEden   String?
+  iptalNedeni String?
+  cariHareket CariHareket?
+
+  @@unique([hesapId, disReferans])
+  @@index([hesapId, tarih])
 }

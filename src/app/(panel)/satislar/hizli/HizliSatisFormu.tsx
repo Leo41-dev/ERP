@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import { sifirlamadan } from "@/components/form";
 import { Alan, Buton, Girdi, HataKutusu, Kart, Secim } from "@/components/ui";
+import type { OdemeHesaplari } from "@/lib/finans";
 import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { UrunSecici, type UrunBulunan } from "@/components/UrunSecici";
 import { sayi } from "@/lib/normalize";
@@ -19,7 +20,7 @@ const bosKalem = (): Kalem => ({ anahtar: Date.now() + Math.random(), aciklama: 
 export type TekliftenHizli = { id: number; no: number; unvan: string; telefon: string; kimlikNo: string; kalemler: Omit<Kalem, "anahtar">[] };
 const virgul = (n: number) => n.toLocaleString("tr-TR", { maximumFractionDigits: 2, useGrouping: false });
 
-export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: { id: number; unvan: string; varsayilan: boolean }[]; teklif?: TekliftenHizli; kdvOranlari: string[] }) {
+export function HizliSatisFormu({ firmalar, teklif, kdvOranlari, hesaplar }: { hesaplar?: OdemeHesaplari; firmalar: { id: number; unvan: string; varsayilan: boolean }[]; teklif?: TekliftenHizli; kdvOranlari: string[] }) {
   const [durum, gonder, bekliyor] = useActionState(hizliSatisKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const [kalemler, setKalemler] = useState<Kalem[]>(() => (teklif?.kalemler.length ? teklif.kalemler.map((x) => ({ ...x, anahtar: Date.now() + Math.random() })) : [bosKalem()]));
@@ -116,7 +117,7 @@ export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: {
       </Kart>
 
       <Kart baslik="Ödeme" sag={<span className={`text-sm ${Math.abs(beklenen - odemeToplam) >= 0.01 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(beklenen)}</span>}>
-        <OdemeSatirlari odemeler={odemeListesi} guncelle={odemeGuncelle} sil={(a) => setOdemeler(odemeListesi.filter((x) => x.anahtar !== a))} />
+        <OdemeSatirlari hesaplar={hesaplar} odemeler={odemeListesi} guncelle={odemeGuncelle} sil={(a) => setOdemeler(odemeListesi.filter((x) => x.anahtar !== a))} />
         {h.odemeler && <p className="mt-2 text-xs text-red-600">{h.odemeler}</p>}
         <Buton
           type="button"

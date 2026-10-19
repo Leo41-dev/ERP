@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState } from "react";
 import { sifirlamadan } from "@/components/form";
+import type { OdemeHesaplari } from "@/lib/finans";
 import { OdemeSatirlari, yeniOdeme, type Odeme } from "@/components/OdemeSatirlari";
 import { Alan, Buton, Girdi, HataKutusu, Kart, Secim } from "@/components/ui";
 import { sayi } from "@/lib/normalize";
@@ -9,7 +10,7 @@ import { tahsilatKaydet } from "../eylem";
 type AcikSatis = { id: number; formNo: number; kalan: number; aciklama: string };
 const tl = (n: number) => n.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
 
-export function TahsilatFormu({ cariId, satislar, secili, bugun }: { cariId: number; satislar: AcikSatis[]; secili: number | null; bugun: string }) {
+export function TahsilatFormu({ cariId, satislar, secili, bugun, hesaplar }: { hesaplar?: OdemeHesaplari; cariId: number; satislar: AcikSatis[]; secili: number | null; bugun: string }) {
   const [durum, gonder, bekliyor] = useActionState(tahsilatKaydet, undefined);
   const h = durum?.hatalar ?? {};
   const ilk = satislar.find((s) => s.id === secili);
@@ -41,7 +42,7 @@ export function TahsilatFormu({ cariId, satislar, secili, bugun }: { cariId: num
         </div>
       </Kart>
       <Kart baslik="Ödeme" sag={<span className={`text-sm ${kalan !== undefined && toplam - kalan >= 0.01 ? "text-amber-600" : "text-zinc-600"}`}>{tl(toplam)}{kalan !== undefined ? ` / kalan ${tl(kalan)}` : ""}</span>}>
-        <OdemeSatirlari
+        <OdemeSatirlari hesaplar={hesaplar}
           odemeler={odemeler}
           guncelle={(a, alan, d) => setOdemeler((l) => l.map((o) => (o.anahtar === a ? { ...o, [alan]: d } : o)))}
           sil={(a) => setOdemeler((l) => l.filter((o) => o.anahtar !== a))}

@@ -60,6 +60,7 @@ export function odemeSatirlari(f: FormData, h: Hatalar): OdemeSatiri[] {
   const taksitler = f.getAll("odeme_taksit").map(String);
   const aciklamalar = f.getAll("odeme_aciklama").map(String);
   const vadeler = f.getAll("odeme_vade").map(String);
+  const hesaplar = f.getAll("odeme_hesap").map(Number);
   const odemeler: OdemeSatiri[] = [];
   yontemler.forEach((y, i) => {
     const tutarHam = (tutarlar[i] ?? "").trim();
@@ -77,7 +78,7 @@ export function odemeSatirlari(f: FormData, h: Hatalar): OdemeSatiri[] {
       vade = /^\d{4}-\d{2}-\d{2}$/.test(vadeler[i] ?? "") ? new Date(`${vadeler[i]}T00:00:00Z`) : null;
       if (!vade) h.odemeler = `${i + 1}. ödeme satırında ${yontem === "SENET" ? "senet" : "çek"} vadesi girilmeli.`;
     }
-    odemeler.push({ yontem, tutar, taksit: yontem === "KART" && taksit > 1 ? taksit : null, vade, aciklama });
+    odemeler.push({ yontem, tutar, taksit: yontem === "KART" && taksit > 1 ? taksit : null, vade, aciklama, hesapId: hesaplar[i] || null });
   });
   return odemeler;
 }

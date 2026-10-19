@@ -34,6 +34,15 @@ export const MODULLER: Modul[] = [
     islemler: [{ href: "/tahsilat/yeni", ad: "Tahsilat al", roller: SATIS_ROLLERI }],
   },
   {
+    ad: "Banka ve kasa",
+    aciklama: "Kasa, banka, POS hesapları, masraf, virman",
+    ana: { href: "/finans", ad: "Banka ve kasa", roller: ["MUHASEBE"] },
+    islemler: [
+      { href: "/finans/hareket?tur=CIKIS", ad: "Masraf / ödeme gir", roller: ["MUHASEBE"] },
+      { href: "/finans/hareket?tur=VIRMAN", ad: "Virman", roller: ["MUHASEBE"] },
+    ],
+  },
+  {
     ad: "Müşteriler",
     aciklama: "Cari kartlar, ekstre",
     ana: { href: "/musteriler", ad: "Müşteriler" },
@@ -71,6 +80,7 @@ export const MODULLER: Modul[] = [
     islemler: [
       { href: "/ayarlar/satis", ad: "Satış ayarları", roller: ["YONETICI"] },
       { href: "/ayarlar/stok", ad: "Stok ayarları", roller: ["YONETICI"] },
+      { href: "/ayarlar/finans", ad: "Finans ayarları", roller: ["YONETICI"] },
       { href: "/ayarlar/kullanicilar", ad: "Kullanıcılar", roller: ["YONETICI"] },
     ],
   },

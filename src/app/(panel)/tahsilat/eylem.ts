@@ -7,6 +7,7 @@ import type { Hatalar } from "@/lib/dogrulama/cari";
 import { odemeSatirlari } from "@/lib/dogrulama/satis";
 import { yetkiIste } from "@/lib/oturum";
 import { YONTEM_AD_KISA } from "./ortak";
+import { tahsilatHareketleriniIptalEt, tahsilatHesabaYaz } from "@/lib/finans";
 
 export type TahsilatDurum = { hatalar?: Hatalar; genel?: string } | undefined;
 
@@ -37,9 +38,9 @@ export async function tahsilatKaydet(_: TahsilatDurum, f: FormData): Promise<Tah
       const t = await tx.tahsilat.create({
         data: { cariId, satisId: satis?.id ?? null, tarih, yontem: o.yontem, tutar: dec(o.tutar), taksit: o.taksit, vade: o.vade, aciklama: [o.aciklama, aciklama].filter(Boolean).join(" · ") || null, kaydeden: k.adSoyad },
       });
-      await tx.cariHareket.create({
-        data: { cariId, tarih, alacak: dec(o.tutar), aciklama: `Tahsilat (${YONTEM_AD_KISA[o.yontem]})${satis ? `, satış ${satis.formNo}` : ""}`, satisId: satis?.id ?? null, tahsilatId: t.id },
-      });
+      const metin = `Tahsilat (${YONTEM_AD_KISA[o.yontem]})${satis ? `, satış ${satis.formNo}` : ""}`;
+      await tx.cariHareket.create({ data: { cariId, tarih, alacak: dec(o.tutar), aciklama: metin, satisId: satis?.id ?? null, tahsilatId: t.id } });
+      await tahsilatHesabaYaz(tx, t, o.hesapId, k.adSoyad, `${metin} · ${cari.unvan}`);
       idler.push(t.id);
     }
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "TAHSILAT", tablo: "Tahsilat", kayitId: idler.join(","), detay: { cariId, satisId, toplam: odemeler.reduce((t, o) => t + o.tutar, 0) } } });
@@ -64,6 +65,7 @@ export async function tahsilatIptal(id: number, neden: string): Promise<{ hata?:
   await db.$transaction(async (tx) => {
     const g = await tx.tahsilat.updateMany({ where: { id, iptalZamani: null }, data: { iptalZamani: new Date(), iptalEden: k.adSoyad, iptalNedeni: neden } });
     if (g.count !== 1) throw new Error("Bu tahsilat zaten iptal edilmiş.");
+    await tahsilatHareketleriniIptalEt(tx, [id], k.adSoyad, neden);
     await tx.cariHareket.create({ data: { cariId: t.cariId, tarih: new Date(), borc: t.tutar, aciklama: `Tahsilat iptali (${YONTEM_AD_KISA[t.yontem]}): ${neden}`, satisId: t.satisId } });
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "IPTAL", tablo: "Tahsilat", kayitId: String(id), detay: { neden } } });
   });
@@ -74,11 +76,18 @@ export async function tahsilatIptal(id: number, neden: string): Promise<{ hata?:
 }
 
 /** Senet / çek vadesinde tahsil edildi olarak işaretlenir (cari zaten alındığında alacaklandırıldı). */
-export async function senetTahsilEdildi(id: number): Promise<{ hata?: string }> {
+export async function senetTahsilEdildi(id: number, hesapId?: number | null): Promise<{ hata?: string }> {
   const k = await yetkiIste("MUHASEBE");
-  const g = await db.tahsilat.updateMany({ where: { id, yontem: { in: ["SENET", "CEK"] }, tahsilTarihi: null, iptalZamani: null }, data: { tahsilTarihi: new Date() } });
-  if (g.count !== 1) return { hata: "Senet / çek bulunamadı ya da zaten işlenmiş." };
-  await db.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "SENET_TAHSIL", tablo: "Tahsilat", kayitId: String(id) } });
+  // tahsil edilen senet / çek varsayılan hesabına (Ayarlar → Finans) giriş yazar
+  const hata = await db.$transaction(async (tx) => {
+    const g = await tx.tahsilat.updateMany({ where: { id, yontem: { in: ["SENET", "CEK"] }, tahsilTarihi: null, iptalZamani: null }, data: { tahsilTarihi: new Date() } });
+    if (g.count !== 1) return "Senet / çek bulunamadı ya da zaten işlenmiş.";
+    const t = await tx.tahsilat.findUniqueOrThrow({ where: { id }, include: { cari: { select: { unvan: true } } } });
+    await tahsilatHesabaYaz(tx, { ...t, tarih: new Date() }, hesapId, k.adSoyad, `${YONTEM_AD_KISA[t.yontem]} tahsili · ${t.cari.unvan}`, true);
+    await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: "SENET_TAHSIL", tablo: "Tahsilat", kayitId: String(id) } });
+    return null;
+  });
+  if (hata) return { hata };
   revalidatePath("/tahsilat");
   return {};
 }
