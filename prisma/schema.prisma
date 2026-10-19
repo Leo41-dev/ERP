@@ -1,0 +1,877 @@
+// Kartepe ATV ERP – veritabanı şeması
+// Tutarlar Decimal(14,2), oranlar kesir olarak Decimal(6,4) tutulur (0.25 = %25).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enum'lar
+
+enum Rol {
+  YONETICI
+  SATIS
+  DEPO
+  SERVIS
+  MUHASEBE
+}
+
+enum CariTip {
+  BIREYSEL
+  KURUMSAL
+}
+
+enum CariRol {
+  MUSTERI
+  TEDARIKCI
+  MUSTERI_TEDARIKCI
+}
+
+enum UrunTur {
+  ARAC
+  YEDEK_PARCA
+  AKSESUAR
+  HIZMET
+  DIGER
+}
+
+enum ParaBirimi {
+  TRY
+  EUR
+  USD
+}
+
+enum Kondisyon {
+  SIFIR
+  IKINCI_EL
+  KONSINYE
+}
+
+enum AracDurum {
+  STOKTA
+  REZERVE
+  SATILDI
+  IADE
+}
+
+enum TescilDurum {
+  TESCILSIZ
+  BASVURUDA
+  TESCILLI
+}
+
+enum MaliyetTur {
+  ALIS
+  OTV
+  KDV_FARKI
+  AKSESUAR
+  POS
+  NAKLIYE
+  DIGER
+}
+
+enum StokHareketTur {
+  ACILIS
+  ALIS
+  SATIS
+  IADE
+  SAYIM
+  CIKIS // fire, kayıp, iç kullanım
+  IPTAL // iptal edilen satışın stoğa dönüşü
+}
+
+/// Vergi motoru: hesap şekilleri (src/lib/vergiHesap.ts)
+enum VergiHesap {
+  YUZDE
+  BIRIM_TUTAR
+  SABIT_TUTAR
+  KDV_TEVKIFAT
+}
+
+/// Ürün satış fiyatı elle mi girilir, yoksa son alış fiyatı üzerine kâr oranıyla mı hesaplanır
+enum FiyatTipi {
+  SABIT
+  MARJ
+}
+
+enum SayimDurum {
+  ACIK
+  KAPALI
+}
+
+enum SatisTur {
+  ARAC // şaseli araç satışı (satış formu + PDI)
+  HIZLI // araç dışı tezgâh satışı: parça, aksesuar, ekipman, hizmet
+}
+
+enum SatisDurum {
+  TASLAK
+  KAYITLI
+  FATURALANDI
+  IPTAL
+  IADE // tüm kalemler iade edildi
+}
+
+enum TeklifDurum {
+  ACIK
+  KABUL // satışa dönüştü
+  RET
+}
+
+enum HesapTur {
+  KASA
+  BANKA
+  POS
+  KREDI_KARTI
+}
+
+enum HareketKaynak {
+  MANUEL
+  TAHSILAT
+  GERI_ODEME
+  VIRMAN
+  ENTEGRASYON
+}
+
+enum KategoriTur {
+  GELIR
+  GIDER
+}
+
+enum OdemeYontem {
+  HAVALE
+  KART
+  NAKIT
+  SENET
+  CEK
+  DIGER
+}
+
+// ---------------------------------------------------------------- tanımlar
+
+model Firma {
+  id           Int            @id @default(autoincrement())
+  unvan        String
+  vkn          String         @unique
+  vergiDairesi String?
+  adres        String?
+  varsayilan   Boolean        @default(false)
+  aktif        Boolean        @default(true)
+  satislar     Satis[]
+  teklifler    Teklif[]
+  hesaplar     FinansHesabi[]
+}
+
+model Kullanici {
+  id           Int           @id @default(autoincrement())
+  kullaniciAdi String        @unique
+  adSoyad      String
+  eposta       String?       @unique
+  sifreOzet    String? // boşsa kullanıcı giriş yapamaz (aktarılan personel için şifre sonradan belirlenir)
+  rol          Rol           @default(SATIS)
+  aktif        Boolean       @default(true)
+  sonGiris     DateTime?
+  hataliDeneme Int           @default(0)
+  kilitBitis   DateTime?
+  oturumlar    Oturum[]
+  olusturma    DateTime      @default(now())
+  satislar     Satis[]       @relation("Satici")
+  teklifler    Teklif[]      @relation("TeklifSatici")
+  hedefler     SatisHedefi[]
+}
+
+model Oturum {
+  id          String    @id // token'ın SHA-256 özeti; token yalnızca çerezde durur
+  kullaniciId Int
+  kullanici   Kullanici @relation(fields: [kullaniciId], references: [id], onDelete: Cascade)
+  bitis       DateTime
+  olusturma   DateTime  @default(now())
+
+  @@index([kullaniciId])
+}
+
+model Konum {
+  id           Int              @id @default(autoincrement())
+  ad           String           @unique
+  aktif        Boolean          @default(true)
+  araclar      Arac[]
+  transferEski KonumTransferi[] @relation("EskiKonum")
+  transferYeni KonumTransferi[] @relation("YeniKonum")
+}
+
+// ÖTV elle seçilir; bu tablo seçilebilecek oranların listesidir.
+/// KDV ve ÖTV dışındaki vergiler (ÖİV, konaklama, damga, maktu vergiler, tevkifat, stopaj). Oran ve kodu işletme girer.
+model VergiTanimi {
+  id           Int         @id @default(autoincrement())
+  ad           String      @unique
+  kod          String? // GİB vergi kodu
+  hesap        VergiHesap
+  deger        Decimal     @db.Decimal(12, 4) // varsayılan: yüzde/tevkifat için oran (0,02), tutar bazlıda TL
+  kdvMatrahina Boolean     @default(false)
+  kesinti      Boolean     @default(false) // toplama girmez, tahsil edilecekten düşer
+  aciklama     String?
+  aktif        Boolean     @default(true)
+  urunler      UrunVergi[]
+}
+
+model UrunVergi {
+  urunId  Int
+  urun    Urun        @relation(fields: [urunId], references: [id], onDelete: Cascade)
+  vergiId Int
+  vergi   VergiTanimi @relation(fields: [vergiId], references: [id])
+  deger   Decimal     @db.Decimal(12, 4)
+
+  @@id([urunId, vergiId])
+}
+
+/// Satış anında hesaplanan ek vergilerin kopyası; tanım sonradan değişse de belge aynı kalır
+model SatisKalemiVergi {
+  id           Int         @id @default(autoincrement())
+  kalemId      Int
+  kalem        SatisKalemi @relation(fields: [kalemId], references: [id], onDelete: Cascade)
+  vergiId      Int?
+  ad           String
+  kod          String?
+  hesap        VergiHesap
+  deger        Decimal     @db.Decimal(12, 4)
+  kdvMatrahina Boolean
+  kesinti      Boolean
+  tutar        Decimal     @db.Decimal(14, 2)
+}
+
+model KdvOrani {
+  id    Int     @id @default(autoincrement())
+  oran  Decimal @unique @db.Decimal(6, 4)
+  aktif Boolean @default(true)
+}
+
+model OtvOrani {
+  id    Int     @id @default(autoincrement())
+  oran  Decimal @unique @db.Decimal(6, 4)
+  aktif Boolean @default(true)
+}
+
+model AracTipi {
+  id                 Int          @id @default(autoincrement())
+  ad                 String       @unique
+  varsayilanOtvOrani Decimal?     @db.Decimal(6, 4) // öneri amaçlı; satışta oran elle seçilir
+  modeller           AracModeli[]
+}
+
+model Marka {
+  id           Int          @id @default(autoincrement())
+  ad           String       @unique
+  iskontoOrani Decimal?     @db.Decimal(6, 4)
+  modeller     AracModeli[]
+}
+
+model AracModeli {
+  id              Int            @id @default(autoincrement())
+  markaId         Int
+  marka           Marka          @relation(fields: [markaId], references: [id])
+  model           String
+  altModel        String         @default("")
+  tipId           Int?
+  tip             AracTipi?      @relation(fields: [tipId], references: [id])
+  araclar         Arac[]
+  eslemeler       FaturaEsleme[]
+  teklifKalemleri TeklifKalemi[]
+
+  @@unique([markaId, model, altModel])
+}
+
+model DovizKuru {
+  id         Int        @id @default(autoincrement())
+  paraBirimi ParaBirimi
+  tarih      DateTime   @db.Date
+  kur        Decimal    @db.Decimal(14, 4)
+
+  @@unique([paraBirimi, tarih])
+}
+
+model KontrolMaddesi {
+  id    Int     @id @default(autoincrement())
+  ad    String  @unique
+  sira  Int
+  aktif Boolean @default(true)
+}
+
+// ---------------------------------------------------------------- cari
+
+model Cari {
+  id               Int             @id @default(autoincrement())
+  tip              CariTip         @default(BIREYSEL)
+  rol              CariRol         @default(MUSTERI)
+  unvan            String
+  tckn             String?
+  vkn              String?
+  vergiDairesi     String?
+  tckkSeriNo       String?
+  dogumTarihi      DateTime?       @db.Date
+  telefon          String? // 10 hane, başında 0 olmadan
+  telefon2         String?
+  eposta           String?
+  il               String?
+  ilce             String?
+  acikAdres        String?
+  eTebligat        Boolean         @default(false)
+  kvkkOnay         Boolean         @default(false)
+  not              String?
+  olusturma        DateTime        @default(now())
+  satislar         Satis[]
+  teklifler        Teklif[]
+  tahsilatlar      Tahsilat[]
+  hareketler       CariHareket[]
+  garantiler       Garanti[]
+  tedarikEdilen    Arac[]          @relation("Tedarikci")
+  hesapHareketleri HesapHareketi[]
+  stokGirisleri    StokGiris[]     @relation("StokGirisTedarikci")
+
+  @@index([tckn])
+  @@index([vkn])
+  @@index([telefon])
+  @@index([unvan])
+}
+
+model CariHareket {
+  id              Int            @id @default(autoincrement())
+  cariId          Int
+  cari            Cari           @relation(fields: [cariId], references: [id])
+  tarih           DateTime
+  borc            Decimal        @default(0) @db.Decimal(14, 2)
+  alacak          Decimal        @default(0) @db.Decimal(14, 2)
+  aciklama        String?
+  satisId         Int?
+  satis           Satis?         @relation(fields: [satisId], references: [id])
+  tahsilatId      Int?           @unique
+  tahsilat        Tahsilat?      @relation(fields: [tahsilatId], references: [id])
+  iadeId          Int?
+  iade            Iade?          @relation(fields: [iadeId], references: [id])
+  geriOdemeId     Int?           @unique
+  geriOdeme       GeriOdeme?     @relation(fields: [geriOdemeId], references: [id])
+  hesapHareketiId Int?           @unique // banka/kasa ekranından cariye bağlı girilen hareket
+  hesapHareketi   HesapHareketi? @relation(fields: [hesapHareketiId], references: [id])
+
+  @@index([cariId, tarih])
+}
+
+// ---------------------------------------------------------------- stok
+
+model Urun {
+  id          Int               @id @default(autoincrement())
+  kod         String            @unique
+  ad          String
+  grupId      Int?
+  grup        UrunGrubu?        @relation(fields: [grupId], references: [id])
+  markaId     Int?
+  marka       UrunMarkasi?      @relation(fields: [markaId], references: [id])
+  tur         UrunTur
+  birim       String            @default("Adet")
+  barkod      String?
+  kdvOrani    Decimal           @default(0.2) @db.Decimal(6, 4)
+  otvOrani    Decimal           @default(0) @db.Decimal(6, 4)
+  alisFiyati  Decimal?          @db.Decimal(14, 2)
+  satisFiyati Decimal?          @db.Decimal(14, 2)
+  kdvDahil    Boolean           @default(false) // satış fiyatı KDV dahil mi
+  fiyatTipi   FiyatTipi         @default(SABIT)
+  karOrani    Decimal?          @db.Decimal(8, 4) // MARJ: satış fiyatı = son alış × (1 + kâr oranı) + vergiler
+  paraBirimi  ParaBirimi        @default(TRY)
+  raf         String?
+  kritikStok  Decimal?          @db.Decimal(14, 3)
+  aktif       Boolean           @default(true)
+  // hareketlerden türeyen önbellek: her hareket aynı işlemde günceller
+  miktar      Decimal           @default(0) @db.Decimal(14, 3)
+  ortMaliyet  Decimal?          @db.Decimal(14, 4) // ağırlıklı ortalama birim maliyet, KDV hariç TL
+  not         String?
+  olusturma   DateTime          @default(now())
+  hareketler  StokHareketi[]
+  kalemler    SatisKalemi[]
+  esleme      UrunEsleme[]
+  girisler    StokGirisKalemi[]
+  sayimlar    SayimSatiri[]
+  vergiler    UrunVergi[]
+
+  @@index([barkod])
+  @@index([ad])
+}
+
+/// Ürün grupları ve markaları Ayarlar'dan tanımlanır; silinmez, pasif yapılır.
+model UrunGrubu {
+  id      Int     @id @default(autoincrement())
+  ad      String  @unique
+  aktif   Boolean @default(true)
+  urunler Urun[]
+}
+
+model UrunMarkasi {
+  id      Int     @id @default(autoincrement())
+  ad      String  @unique
+  aktif   Boolean @default(true)
+  urunler Urun[]
+}
+
+model StokHareketi {
+  id            Int            @id @default(autoincrement())
+  urunId        Int
+  urun          Urun           @relation(fields: [urunId], references: [id])
+  tarih         DateTime       @default(now())
+  tur           StokHareketTur
+  miktar        Decimal        @db.Decimal(14, 3) // giriş +, çıkış -
+  birimMaliyet  Decimal?       @db.Decimal(14, 4) // girişte alış maliyeti, çıkışta o anki ortalama maliyet
+  bakiye        Decimal        @db.Decimal(14, 3) // hareketten sonraki miktar
+  satisId       Int?
+  satis         Satis?         @relation(fields: [satisId], references: [id])
+  satisKalemiId Int?
+  iadeId        Int?
+  iade          Iade?          @relation(fields: [iadeId], references: [id])
+  stokGirisId   Int?
+  stokGiris     StokGiris?     @relation(fields: [stokGirisId], references: [id])
+  sayimId       Int?
+  sayim         Sayim?         @relation(fields: [sayimId], references: [id])
+  aciklama      String?
+  kaydeden      String?
+
+  @@index([urunId, tarih])
+  @@index([satisId])
+}
+
+/// Tedarikçiden mal girişi (alış faturası ya da irsaliye). Elle ya da e-fatura XML'inden.
+model StokGiris {
+  id          Int               @id @default(autoincrement())
+  girisNo     Int               @unique @default(autoincrement())
+  tedarikciId Int?
+  tedarikci   Cari?             @relation("StokGirisTedarikci", fields: [tedarikciId], references: [id])
+  faturaNo    String?
+  tarih       DateTime          @db.Date
+  araToplam   Decimal           @db.Decimal(14, 2) // KDV hariç
+  kdvToplam   Decimal           @db.Decimal(14, 2)
+  genelToplam Decimal           @db.Decimal(14, 2)
+  kaynak      String            @default("ELLE") // ELLE | XML
+  not         String?
+  kaydeden    String
+  olusturma   DateTime          @default(now())
+  kalemler    StokGirisKalemi[]
+  hareketler  StokHareketi[]
+
+  @@index([tedarikciId, faturaNo])
+}
+
+model StokGirisKalemi {
+  id         Int       @id @default(autoincrement())
+  girisId    Int
+  giris      StokGiris @relation(fields: [girisId], references: [id], onDelete: Cascade)
+  sira       Int
+  urunId     Int
+  urun       Urun      @relation(fields: [urunId], references: [id])
+  faturaAdi  String? // tedarikçi faturasındaki ad (XML'den)
+  miktar     Decimal   @db.Decimal(14, 3)
+  birimFiyat Decimal   @db.Decimal(14, 4) // KDV hariç, iskonto düşülmüş
+  kdvOrani   Decimal   @db.Decimal(6, 4)
+  tutar      Decimal   @db.Decimal(14, 2) // KDV hariç satır toplamı
+}
+
+/// Tedarikçi faturasındaki ürünün karşılığı olan stok kartı (anahtar: tedarikçi VKN | tedarikçi ürün kodu ya da adı)
+model UrunEsleme {
+  anahtar    String   @id
+  urunId     Int
+  urun       Urun     @relation(fields: [urunId], references: [id], onDelete: Cascade)
+  guncelleme DateTime @updatedAt
+}
+
+model Sayim {
+  id         Int            @id @default(autoincrement())
+  sayimNo    Int            @unique @default(autoincrement())
+  aciklama   String
+  durum      SayimDurum     @default(ACIK)
+  baslangic  DateTime       @default(now())
+  kapanis    DateTime?
+  kaydeden   String
+  satirlar   SayimSatiri[]
+  hareketler StokHareketi[]
+}
+
+model SayimSatiri {
+  id         Int      @id @default(autoincrement())
+  sayimId    Int
+  sayim      Sayim    @relation(fields: [sayimId], references: [id], onDelete: Cascade)
+  urunId     Int
+  urun       Urun     @relation(fields: [urunId], references: [id])
+  sayilan    Decimal  @db.Decimal(14, 3)
+  sistem     Decimal? @db.Decimal(14, 3) // kapanışta sistemdeki miktar
+  guncelleme DateTime @updatedAt
+
+  @@unique([sayimId, urunId])
+}
+
+// Seri numaralı stok: her araç ayrı kayıt. Teknik servisin de ana anahtarı.
+model Arac {
+  id           Int              @id @default(autoincrement())
+  sase         String           @unique
+  motorNo      String?
+  modelId      Int?
+  model        AracModeli?      @relation(fields: [modelId], references: [id])
+  yil          Int?
+  renk         String?
+  euroStandart String?
+  kondisyon    Kondisyon        @default(SIFIR)
+  durum        AracDurum        @default(STOKTA)
+  konumId      Int?
+  konum        Konum?           @relation(fields: [konumId], references: [id])
+  gelisTarihi  DateTime?        @db.Date
+  tedarikciId  Int?
+  tedarikci    Cari?            @relation("Tedarikci", fields: [tedarikciId], references: [id])
+  alisFaturaNo String?
+  alisSekli    String?
+  kdvOrani     Decimal?         @db.Decimal(6, 4)
+  otvOrani     Decimal?         @db.Decimal(6, 4)
+  // tescil
+  tescilDurum  TescilDurum      @default(TESCILSIZ)
+  plaka        String?
+  ruhsatSeriNo String?
+  tescilTarihi DateTime?        @db.Date
+  not          String?
+  olusturma    DateTime         @default(now())
+  maliyetler   AracMaliyet[]
+  transferler  KonumTransferi[]
+  kalemler     SatisKalemi[]
+  garanti      Garanti?
+
+  @@index([durum])
+  @@index([plaka])
+}
+
+model AracMaliyet {
+  id       Int        @id @default(autoincrement())
+  aracId   Int
+  arac     Arac       @relation(fields: [aracId], references: [id], onDelete: Cascade)
+  tur      MaliyetTur
+  tutar    Decimal    @db.Decimal(14, 2)
+  aciklama String?
+}
+
+model KonumTransferi {
+  id          Int      @id @default(autoincrement())
+  aracId      Int
+  arac        Arac     @relation(fields: [aracId], references: [id])
+  eskiKonumId Int?
+  eskiKonum   Konum?   @relation("EskiKonum", fields: [eskiKonumId], references: [id])
+  yeniKonumId Int
+  yeniKonum   Konum    @relation("YeniKonum", fields: [yeniKonumId], references: [id])
+  yapan       String?
+  tarih       DateTime @default(now())
+}
+
+// ---------------------------------------------------------------- satış
+
+model Satis {
+  id              Int            @id @default(autoincrement())
+  formNo          Int            @unique @default(autoincrement()) // iptal edilen numara yeniden kullanılmaz
+  tur             SatisTur       @default(ARAC)
+  firmaId         Int?
+  firma           Firma?         @relation(fields: [firmaId], references: [id])
+  cariId          Int
+  cari            Cari           @relation(fields: [cariId], references: [id])
+  saticiId        Int?
+  satici          Kullanici?     @relation("Satici", fields: [saticiId], references: [id])
+  tarih           DateTime
+  durum           SatisDurum     @default(TASLAK)
+  paraBirimi      ParaBirimi     @default(TRY)
+  kur             Decimal        @default(1) @db.Decimal(14, 4)
+  araToplam       Decimal?       @db.Decimal(14, 2)
+  iskontoToplam   Decimal?       @db.Decimal(14, 2)
+  otvToplam       Decimal?       @db.Decimal(14, 2)
+  kdvToplam       Decimal?       @db.Decimal(14, 2)
+  ekVergiToplam   Decimal        @default(0) @db.Decimal(14, 2) // KDV ve ÖTV dışındaki vergiler
+  kesintiToplam   Decimal        @default(0) @db.Decimal(14, 2) // tevkifat, stopaj: tahsil edilecekten düşer
+  // Satıcının elle belirlediği tutar. Fatura bu tutarla kesilir; ayrı bir fiyat alanı yoktur.
+  genelToplam     Decimal        @db.Decimal(14, 2)
+  teslimTarihi    DateTime?      @db.Date
+  aksesuarlar     String? // satışla birlikte verilen aksesuarlar (serbest metin)
+  hizmetler       String?
+  not             String?
+  faturaNo        String?
+  faturaTarihi    DateTime?      @db.Date
+  eFaturaUuid     String?        @unique
+  iptalNedeni     String?
+  iptalEden       String?
+  iptalZamani     DateTime?
+  olusturma       DateTime       @default(now())
+  guncelleme      DateTime       @updatedAt
+  kalemler        SatisKalemi[]
+  tahsilatlar     Tahsilat[]
+  stokHareketleri StokHareketi[]
+  cariHareketleri CariHareket[]
+  teslimKontrol   TeslimKontrol?
+  teklif          Teklif?
+  iadeler         Iade[]
+
+  @@index([tarih])
+  @@index([durum])
+  @@index([tur, tarih])
+}
+
+model SatisKalemi {
+  id           Int                @id @default(autoincrement())
+  satisId      Int
+  satis        Satis              @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  urunId       Int?
+  urun         Urun?              @relation(fields: [urunId], references: [id])
+  aracId       Int?
+  arac         Arac?              @relation(fields: [aracId], references: [id])
+  aciklama     String
+  miktar       Decimal            @default(1) @db.Decimal(14, 3)
+  birimFiyat   Decimal            @db.Decimal(14, 2) // vergiler hariç
+  iskontoOrani Decimal            @default(0) @db.Decimal(6, 4)
+  otvOrani     Decimal            @default(0) @db.Decimal(6, 4)
+  kdvOrani     Decimal            @default(0.2) @db.Decimal(6, 4)
+  tutar        Decimal            @db.Decimal(14, 2) // vergiler dahil satır toplamı
+  iadeler      IadeKalemi[]
+  vergiler     SatisKalemiVergi[]
+}
+
+// Satıştan iade. Kayıtlar silinmez: cariye alacak, müşteriye yapılan geri ödeme için borç yazılır.
+model Iade {
+  id              Int            @id @default(autoincrement())
+  iadeNo          Int            @unique @default(autoincrement())
+  satisId         Int
+  satis           Satis          @relation(fields: [satisId], references: [id])
+  tarih           DateTime       @default(now())
+  tutar           Decimal        @db.Decimal(14, 2) // vergiler dahil
+  otvToplam       Decimal        @db.Decimal(14, 2)
+  kdvToplam       Decimal        @db.Decimal(14, 2)
+  neden           String
+  faturaNo        String? // iade faturası
+  kaydeden        String
+  kalemler        IadeKalemi[]
+  geriOdemeler    GeriOdeme[]
+  cariHareketler  CariHareket[]
+  stokHareketleri StokHareketi[]
+
+  @@index([tarih])
+}
+
+model IadeKalemi {
+  id            Int         @id @default(autoincrement())
+  iadeId        Int
+  iade          Iade        @relation(fields: [iadeId], references: [id], onDelete: Cascade)
+  satisKalemiId Int
+  satisKalemi   SatisKalemi @relation(fields: [satisKalemiId], references: [id])
+  miktar        Decimal     @db.Decimal(14, 3)
+  tutar         Decimal     @db.Decimal(14, 2)
+}
+
+/// İade nedeniyle müşteriye ödenen para
+model GeriOdeme {
+  id            Int            @id @default(autoincrement())
+  iadeId        Int
+  iade          Iade           @relation(fields: [iadeId], references: [id], onDelete: Cascade)
+  yontem        OdemeYontem
+  tutar         Decimal        @db.Decimal(14, 2)
+  aciklama      String?
+  cariHareket   CariHareket?
+  hesapId       Int?
+  hesap         FinansHesabi?  @relation(fields: [hesapId], references: [id])
+  hesapHareketi HesapHareketi?
+}
+
+model Tahsilat {
+  id            Int            @id @default(autoincrement())
+  cariId        Int
+  cari          Cari           @relation(fields: [cariId], references: [id])
+  satisId       Int?
+  satis         Satis?         @relation(fields: [satisId], references: [id])
+  tarih         DateTime       @default(now())
+  yontem        OdemeYontem
+  tutar         Decimal        @db.Decimal(14, 2)
+  taksit        Int?
+  vade          DateTime?      @db.Date // senet / çek vadesi
+  tahsilTarihi  DateTime?      @db.Date // senet / çek tahsil edildiğinde
+  aciklama      String?
+  kaydeden      String?
+  iptalNedeni   String?
+  iptalEden     String?
+  iptalZamani   DateTime? // iptal edilen tahsilat silinmez, cariye ters kayıt atılır
+  cariHareket   CariHareket?
+  hesapId       Int? // paranın girdiği kasa / banka / POS hesabı (senet ve çekte tahsil edildiğinde)
+  hesap         FinansHesabi?  @relation(fields: [hesapId], references: [id])
+  hesapHareketi HesapHareketi?
+
+  @@index([yontem, vade])
+}
+
+// Teklif cari açmaz: müşteri bilgisi teklifin üzerinde durur; kimlik ya da telefon kayıtlıysa cariye bağlanır.
+model Teklif {
+  id             Int            @id @default(autoincrement())
+  teklifNo       Int            @unique @default(autoincrement())
+  firmaId        Int?
+  firma          Firma?         @relation(fields: [firmaId], references: [id])
+  cariId         Int?
+  cari           Cari?          @relation(fields: [cariId], references: [id])
+  musteriAd      String
+  telefon        String?
+  eposta         String?
+  kimlikNo       String?
+  saticiId       Int?
+  satici         Kullanici?     @relation("TeklifSatici", fields: [saticiId], references: [id])
+  tarih          DateTime       @default(now())
+  gecerlilik     DateTime       @db.Date
+  durum          TeklifDurum    @default(ACIK)
+  araToplam      Decimal        @db.Decimal(14, 2)
+  otvToplam      Decimal        @db.Decimal(14, 2)
+  kdvToplam      Decimal        @db.Decimal(14, 2)
+  genelToplam    Decimal        @db.Decimal(14, 2)
+  odemeKosullari String?
+  not            String?
+  retNedeni      String?
+  satisId        Int?           @unique
+  satis          Satis?         @relation(fields: [satisId], references: [id])
+  guncelleme     DateTime       @updatedAt
+  kalemler       TeklifKalemi[]
+
+  @@index([durum, tarih])
+  @@index([telefon])
+}
+
+model TeklifKalemi {
+  id         Int         @id @default(autoincrement())
+  teklifId   Int
+  teklif     Teklif      @relation(fields: [teklifId], references: [id], onDelete: Cascade)
+  sira       Int
+  modelId    Int? // araç satırıysa model; satışa dönüşürken bu modelin stoktaki araçları önerilir
+  model      AracModeli? @relation(fields: [modelId], references: [id])
+  aciklama   String
+  miktar     Decimal     @db.Decimal(14, 3)
+  birimFiyat Decimal     @db.Decimal(14, 2) // vergiler dahil
+  otvOrani   Decimal     @default(0) @db.Decimal(6, 4)
+  kdvOrani   Decimal     @default(0.2) @db.Decimal(6, 4)
+  tutar      Decimal     @db.Decimal(14, 2) // vergiler dahil
+}
+
+model Garanti {
+  id        Int      @id @default(autoincrement())
+  aracId    Int      @unique
+  arac      Arac     @relation(fields: [aracId], references: [id])
+  cariId    Int
+  cari      Cari     @relation(fields: [cariId], references: [id])
+  baslangic DateTime @db.Date
+  bitis     DateTime @db.Date
+  kapsam    String?
+}
+
+model TeslimKontrol {
+  id          Int      @id @default(autoincrement())
+  satisId     Int      @unique
+  satis       Satis    @relation(fields: [satisId], references: [id], onDelete: Cascade)
+  maddeler    Json // [{ ad, tamam }]
+  kontrolEden String
+  tarih       DateTime @default(now())
+}
+
+model SatisHedefi {
+  id          Int       @id @default(autoincrement())
+  kullaniciId Int
+  kullanici   Kullanici @relation(fields: [kullaniciId], references: [id])
+  ay          String // yyyy-MM
+  hedefAdet   Int
+  hedefCiro   Decimal   @db.Decimal(14, 2)
+  bazDonem    String
+
+  @@unique([kullaniciId, ay])
+}
+
+model DenetimKaydi {
+  id        Int      @id @default(autoincrement())
+  zaman     DateTime @default(now())
+  kullanici String?
+  islem     String
+  tablo     String
+  kayitId   String?
+  detay     Json?
+
+  @@index([tablo, kayitId])
+}
+
+/// Kullanım sırasında değiştirilebilen ayarlar (belge başlıkları, metinler). Anahtarlar src/lib/belgeAyarlari.ts içinde.
+model Ayar {
+  anahtar    String   @id
+  deger      String
+  guncelleme DateTime @updatedAt
+}
+
+/// Tedarikçi faturasındaki ürün adının onaylanmış model karşılığı (anahtar: tedarikçi VKN | ürün adı)
+model FaturaEsleme {
+  anahtar    String     @id
+  modelId    Int
+  model      AracModeli @relation(fields: [modelId], references: [id])
+  guncelleme DateTime   @updatedAt
+}
+
+// ---------------------------------------------------------------- banka ve kasa
+
+// Kasa, banka hesabı, POS ve kredi kartı. Bakiye: açılış + girişler − çıkışlar (iptal edilenler hariç).
+model FinansHesabi {
+  id           Int             @id @default(autoincrement())
+  ad           String          @unique
+  tur          HesapTur
+  firmaId      Int?
+  firma        Firma?          @relation(fields: [firmaId], references: [id])
+  banka        String?
+  sube         String?
+  hesapNo      String?
+  iban         String?
+  paraBirimi   ParaBirimi      @default(TRY)
+  acilisBakiye Decimal         @default(0) @db.Decimal(14, 2)
+  acilisTarihi DateTime        @db.Date
+  aciklama     String?
+  aktif        Boolean         @default(true)
+  olusturma    DateTime        @default(now())
+  hareketler   HesapHareketi[]
+  tahsilatlar  Tahsilat[]
+  geriOdemeler GeriOdeme[]
+}
+
+model FinansKategori {
+  id         Int             @id @default(autoincrement())
+  ad         String
+  tur        KategoriTur
+  aktif      Boolean         @default(true)
+  hareketler HesapHareketi[]
+
+  @@unique([tur, ad])
+}
+
+// Hesap hareketi silinmez, iptal edilir. Entegrasyonla gelen satırlar disReferans ile tekilleşir.
+model HesapHareketi {
+  id          Int             @id @default(autoincrement())
+  hesapId     Int
+  hesap       FinansHesabi    @relation(fields: [hesapId], references: [id])
+  tarih       DateTime
+  giris       Decimal         @default(0) @db.Decimal(14, 2)
+  cikis       Decimal         @default(0) @db.Decimal(14, 2)
+  aciklama    String?
+  belgeNo     String?
+  kategoriId  Int?
+  kategori    FinansKategori? @relation(fields: [kategoriId], references: [id])
+  cariId      Int?
+  cari        Cari?           @relation(fields: [cariId], references: [id])
+  tahsilatId  Int?            @unique
+  tahsilat    Tahsilat?       @relation(fields: [tahsilatId], references: [id])
+  geriOdemeId Int?            @unique
+  geriOdeme   GeriOdeme?      @relation(fields: [geriOdemeId], references: [id])
+  virmanNo    String? // aynı virmanın iki bacağı
+  kaynak      HareketKaynak   @default(MANUEL)
+  disReferans String?
+  kaydeden    String?
+  olusturma   DateTime        @default(now())
+  iptalZamani DateTime?
+  iptalEden   String?
+  iptalNedeni String?
+  cariHareket CariHareket?
+
+  @@unique([hesapId, disReferans])
+  @@index([hesapId, tarih])
+}

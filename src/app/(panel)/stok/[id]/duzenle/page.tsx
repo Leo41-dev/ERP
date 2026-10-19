@@ -1,0 +1,36 @@
+import { notFound } from "next/navigation";
+import { SayfaBaslik } from "@/components/ui";
+import { db } from "@/lib/db";
+import { maliyetGorur, yetkiIste } from "@/lib/oturum";
+import { urunTanimlari } from "@/lib/stokTanim";
+import { urunKaydet } from "../../eylem";
+import { UrunFormu } from "../../UrunFormu";
+
+export const metadata = { title: "Ürünü düzenle" };
+
+const yaz = (v: unknown) => (v === null || v === undefined ? undefined : String(v).replace(".", ","));
+
+export default async function UrunDuzenle({ params }: { params: Promise<{ id: string }> }) {
+  const k = await yetkiIste("DEPO", "MUHASEBE");
+  const id = Number((await params).id);
+  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id }, include: { vergiler: true } }) : null;
+  if (!u || u.tur === "ARAC") notFound();
+  const tanim = await urunTanimlari(db, { ...u, vergiIdler: u.vergiler.map((x) => x.vergiId) });
+  return (
+    <>
+      <SayfaBaslik baslik={`${u.kod} · düzenle`} />
+      <UrunFormu
+        eylem={urunKaydet.bind(null, u.id)}
+        {...tanim}
+        yonetici={k.rol === "YONETICI"}
+        seciliVergiler={u.vergiler.map((x) => ({ vergiId: x.vergiId, deger: Number(x.deger) }))}
+        bazMaliyet={u.ortMaliyet === null ? null : Number(u.ortMaliyet)}
+        maliyetGoster={maliyetGorur(k)}
+        v={{
+          ad: u.ad, tur: u.tur, kod: u.kod, barkod: u.barkod ?? undefined, grupId: u.grupId ? String(u.grupId) : undefined, markaId: u.markaId ? String(u.markaId) : undefined, birim: u.birim, raf: u.raf ?? undefined,
+          kritikStok: yaz(u.kritikStok), satisFiyati: yaz(u.satisFiyati), kdvOrani: String(Number(u.kdvOrani)), otvOrani: String(Number(u.otvOrani)), fiyatTipi: u.fiyatTipi, karOrani: u.karOrani === null ? undefined : yaz(Math.round(Number(u.karOrani) * 10000) / 100), alisFiyati: yaz(u.alisFiyati), not: u.not ?? undefined, aktif: u.aktif,
+        }}
+      />
+    </>
+  );
+}

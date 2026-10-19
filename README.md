@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kartepe ATV ERP
 
-## Getting Started
+Kartepe ATV için sıfırdan tasarlanan web tabanlı ERP. Mevcut sistemler (Bilsoft, Google Sheets) bu projeden etkilenmez.
+İlk modül satış; plan ve kararlar proje dosyalarındaki `plan/satis-modulu-plani.md` içinde.
 
-First, run the development server:
+## Teknoloji
+
+- Next.js 15 (App Router, TypeScript, Tailwind)
+- PostgreSQL + Prisma 6
+- Vitest
+
+## Kurulum
 
 ```bash
+npm install
+cp .env.example .env          # DATABASE_URL'yi düzenleyin
+npm run db:migrate            # şemayı veritabanına uygular
+npm run db:seed               # konumlar, ÖTV oranları, PDI listesi ve ilk yönetici
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Örnek verili deneme kurulumu
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Boş bir veritabanında `npm run demo` şemayı uygular ve örnek veriyi yükler (46 araç, 96 satış, teklifler, tahsilatlar). Giriş: `leo` / `deneme1234` (yönetici), `ali` / `satis12345` (satış). Dolu veritabanına dokunmaz.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run demo
+npm run build && npm start      # http://localhost:3000
+```
 
-## Learn More
+## Komutlar
 
-To learn more about Next.js, take a look at the following resources:
+| Komut | Ne yapar |
+|---|---|
+| `npm run dev` | Geliştirme sunucusu |
+| `npm test` | Birim testleri |
+| `npm run typecheck` | Tip kontrolü |
+| `npm run lint` | ESLint |
+| `npm run db:seed` | Başlangıç tanımları; tekrar çalıştırmak güvenli |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Modüller
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Giriş ve roller:** Yönetici, Satış, Depo, Servis, Muhasebe. Satış personeli maliyet ve kâr görmez, yalnızca kendi satışlarını görür.
+- **Müşteriler:** aynı TCKN/VKN ile ikinci kayıt açılmaz.
+- **Araçlar:** şase bazlı stok, konum (Başiskele, Acısu, Atölye) ve transfer geçmişi, maliyet kalemleri, tescil bilgisi.
+- **Fatura ile araç girişi:** tedarikçi e-Fatura (UBL-TR) XML'lerinden şase, motor, yıl, renk ve alış fiyatı okunur; model önerilir, onaylanan eşleme tedarikçi bazında hatırlanır. Stokta olan şase tekrar girilmez.
+- **QR etiket:** 58×40 / 40×58 mm etiket; QR aracın ERP sayfasını açar.
+- **Satış:** araç rezerve edilir, ÖTV oranı elle seçilir, fatura tutarı elle girilir ve vergi kırılımı ondan hesaplanır; ödeme satırları, PDI, fatura no işleme, iptal (kayıt silinmez). Satış formu ve PDI yazdırılır.
+- **Hızlı satış:** araç dışı satışlar (parça, aksesuar, ekipman, hizmet) için tek ekranda kalem, kartla/bölünmüş ödeme ve 80 mm ya da A5 satış fişi. Müşteri isteğe bağlı; boşsa perakende müşteri.
+- **Stok (parça, aksesuar, hizmet):** ürün kartı (otomatik kod YP/AK/HZ/DG, barkod, raf, kritik seviye), ağırlıklı ortalama maliyet, her hareketin kalan bakiyesiyle dökümü. Tedarikçi e-Fatura XML'iyle ya da elle stok girişi; satırlar barkod, kod veya adla ürüne eşlenir, eşleşmeyenler için kart açılır ve seçim tedarikçi bazında hatırlanır, aynı fatura ikinci kez girilirken uyarır. Hızlı satışta barkod okutma ve stok kontrolü: satış personeli stoktan fazlasını satamaz, yönetici onayıyla eksiye düşebilir. Satış iptali ve iade (isteğe bağlı) stoğa geri alır. Satış fiyatı elle girilir ya da son alış fiyatı üzerine kâr oranıyla hesaplanır (stok girişinde alış değişince güncellenir); ürün kartında KDV ve ÖTV seçilir, ÖTV hızlı satışa ve fişe yansır. Barkod okuyuculu sayım, kapanışta fark kaydı. Panoda sipariş verilecekler listesi, stok listesi CSV.
+- **Tahsilat ve cari:** satıştan veya müşteriden tahsilat (kapora dahil), senet/çek vade portföyü, yazıyla tutarlı makbuz, ters kayıtla tahsilat iptali, yürüyen bakiyeli cari ekstre ve yazdırma.
+- **Teklif:** araç modeli ve aksesuar/hizmet kalemleriyle teklif, satır bazında ÖTV/KDV, A4 çıktı ve WhatsApp mesajı; düzenleme, kopyalama, ret nedeni. Kabul edilen teklif tek tıkla araç satışına ya da hızlı satışa döner. Teklif müşteri kaydı açmaz; kayıtlı müşteriyse kartında görünür.
+- **İade:** faturalı araç satışından ya da hızlı satıştan tam veya kısmi iade; kesinti için tutar düşürülebilir. Araç stoğa (istenirse 2. el olarak) döner, iade cariye alacak, müşteriye yapılan geri ödeme borç yazılır; tamamı iade edilen satış "İade edildi" olur. A5 iade belgesi.
+- **Pano:** dönem seçmeli ciro (araç/hızlı), satılan araç, kâr ve kârlılık, tahsilat, açık alacak, vadesi geçen senet/çek, teklif dönüşümü; günlük/aylık ciro grafiği; bu ayın hedefleri (kayıtlı hedef yoksa son 3 tam ay × 1,10); model ve personel kırılımı, %5 altı kârlılık listesi; stok değeri, bekleme süresi, konum dağılımı, ölü stok (60–180 gün eşik) ve buna göre kampanya önerileri. Satıcı yalnızca kendi rakamlarını görür, maliyet ve kâr yalnızca yönetici/muhasebede.
+- **Satış hedefleri:** Ayarlar → Satış hedefleri; her satıcı için ay ay araç ve ciro hedefi. Önceki 3 ayın gerçekleşeni ve öneri (ortalama × 1,10) yanında görünür; boş bırakılan satırda panoda öneri kullanılır.
+- **Analiz merkezi** (yönetici, muhasebe): stok yaşlandırma, model bazında bekleme, konum × marka, fiyat bandı, satış süresi, ABC analizi, mevsimsellik (son 24 ay), ÖTV yükü, kârlılık dağılımı, tedarikçi performansı, teklif hunisi ve ret nedenleri. Her analiz etkileşimli grafikle gösterilir (üzerine gelince ayrıntı, lejanttan seri gizleme); tablo grafiğin altında açılır ve Excel için CSV olarak indirilir.
+- **Diğer vergiler:** Ayarlar → Satış'ta tanımlanır, ürün kartında seçilir (ürüne özel oran yazılabilir). Hesap şekli: matrahın yüzdesi (ÖİV, konaklama, damga), miktar başına tutar (maktu), satır başına sabit tutar, KDV tevkifatı. KDV matrahına girip girmeyeceği ve kesinti olup olmadığı (stopaj, tevkifat) seçilir; kesintiler toplamı değiştirmez, tahsil edilecekten düşer, cari bakiye ve iade buna göre hesaplanır. Hızlı satışta, satış kaydında ve fişte ayrı satırda görünür.
+- **Banka ve kasa:** kasa, banka hesabı, POS ve kredi kartı hesapları; açılış bakiyesi, yürüyen bakiyeli döküm. Tahsilat (senet/çek tahsil edilince) ve iade ödemeleri seçilen ya da yöntemin varsayılan hesabına (Ayarlar → Finans) kendiliğinden işlenir, iptalde hesap hareketi de iptal olur. Masraf, diğer gelir (kategorili, isteğe bağlı cariye bağlı) ve hesaplar arası virman elle girilir; hareketler silinmez, iptal edilir. Banka entegrasyonu için hareketlerde kaynak ve dış referans alanı hazır. Demo için `npm run demo:finans`.
+- **Ana ekran ve silme:** ana ekranda kullanıcının yetkili olduğu bütün modüller ve sık işlemleri (menü ve kartlar src/lib/moduller.ts'den üretilir). Ürün, hizmet, müşteri, araç, teklif, kullanıcı ve tüm tanımlar silinebilir; hiçbir hareket ya da belgede kullanılmıyorsa silinir, kullanılıyorsa nerede kullanıldığı söylenir ve pasif yapılması önerilir (ilişkiler şemadan otomatik bulunur, src/lib/silme.ts). Silinen kaydın son hali denetim kaydında saklanır. Satış, tahsilat, iade gibi mali belgeler silinmez, iptal edilir.
+- **Ayarlar:** modül bazında sekmeler. Genel: firma bilgileri, ortak belge başlığı. Satış: KDV ve ÖTV oranları, diğer vergiler, satış hedefleri, PDI maddeleri, satış/fiş/teklif belge metinleri. Stok: ürün grupları ve markaları. Araçlar: konumlar, araç tipleri, marka ve modeller. Kullanıcılar. Kullanılmayan tanım silinir, kullanılan pasif yapılır; yeni modül kendi sekmesiyle eklenir.
