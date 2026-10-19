@@ -5,7 +5,7 @@ import { ODEME_AD, SATIS_DURUM_AD, SATIS_DURUM_RENK, tarih, tarihSaat, telefonGo
 import { belgeAyarlari } from "@/lib/belgeAyarlari";
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
-import { satisKalani } from "@/lib/satis/iade";
+import { iadeCariTutari, satisKalani } from "@/lib/satis/iade";
 import { faturaIsle, satisIptal, teslimKontrolKaydet } from "../eylem";
 import { FaturaFormu, IptalFormu, TeslimKontrolFormu } from "./Islemler";
 
@@ -28,7 +28,7 @@ export default async function SatisDetay({ params, searchParams }: { params: Pro
   const tahsil = s.tahsilatlar.filter((x) => !x.iptalZamani).reduce((t, x) => t + Number(x.tutar), 0);
   const iadeToplam = s.iadeler.reduce((t, x) => t + Number(x.tutar), 0);
   const geriOdeme = s.iadeler.reduce((t, x) => t + x.geriOdemeler.reduce((a, g) => a + Number(g.tutar), 0), 0);
-  const kalan = satisKalani({ genelToplam: Number(s.genelToplam), iade: iadeToplam, tahsil, geriOdeme });
+  const kalan = satisKalani({ genelToplam: Number(s.genelToplam), iade: iadeToplam, tahsil, geriOdeme, kesinti: Number(s.kesintiToplam) });
   const iadeAlinir = k.rol !== "DEPO" && k.rol !== "SERVIS" && (s.durum === "FATURALANDI" || (s.durum === "KAYITLI" && s.tur === "HIZLI"));
   const sonIade = s.iadeler.find((x) => x.id === yeniIade);
   const maliyet = s.kalemler.reduce((t, x) => t + (x.arac?.maliyetler.reduce((a, m) => a + Number(m.tutar), 0) ?? 0), 0);
@@ -65,8 +65,10 @@ export default async function SatisDetay({ params, searchParams }: { params: Pro
           <dl className="grid grid-cols-2 gap-2 text-sm">
             <dt className="text-zinc-500">Matrah</dt><dd>{tl(s.araToplam)}</dd>
             <dt className="text-zinc-500">ÖTV</dt><dd>{tl(s.otvToplam)}</dd>
+            {Number(s.ekVergiToplam) > 0 && (<><dt className="text-zinc-500">Diğer vergiler</dt><dd>{tl(s.ekVergiToplam)}</dd></>)}
             <dt className="text-zinc-500">KDV</dt><dd>{tl(s.kdvToplam)}</dd>
             <dt className="font-medium">Toplam (fatura)</dt><dd className="font-medium">{tl(s.genelToplam)}</dd>
+            {Number(s.kesintiToplam) > 0 && (<><dt className="text-zinc-500">Kesinti (stopaj, tevkifat)</dt><dd>−{tl(s.kesintiToplam)}</dd></>)}
             {iadeToplam > 0 && (<><dt className="text-zinc-500">İade</dt><dd>−{tl(iadeToplam)}</dd></>)}
             {maliyetGorur(k) && s.durum !== "IPTAL" && !iadeToplam && (<><dt className="text-zinc-500">Kâr</dt><dd>{tl(Number(s.genelToplam) - maliyet)}</dd></>)}
           </dl>
@@ -95,7 +97,7 @@ export default async function SatisDetay({ params, searchParams }: { params: Pro
 
       <div className="mb-2 mt-6 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">
-          Ödemeler · {tl(tahsil - geriOdeme)} / {tl(Number(s.genelToplam) - iadeToplam)}
+          Ödemeler · {tl(tahsil - geriOdeme)} / {tl(Number(s.genelToplam) - Number(s.kesintiToplam) - iadeCariTutari(iadeToplam, Number(s.genelToplam), Number(s.kesintiToplam)))}
           {s.durum !== "IPTAL" && kalan >= 0.01 && <span className="ml-2 text-amber-700">kalan {tl(kalan)}</span>}
           {s.durum !== "IPTAL" && kalan <= -0.01 && <span className="ml-2 text-red-700">müşteriye borç {tl(-kalan)}</span>}
         </h2>

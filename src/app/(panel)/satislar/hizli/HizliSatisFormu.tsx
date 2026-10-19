@@ -9,6 +9,7 @@ import { kalemHesapla } from "@/lib/satis/hesap";
 import { hizliSatisKaydet } from "./eylem";
 import { yuzde } from "@/lib/bicim";
 import { secenekli } from "@/lib/vergi";
+import { vergiEtiketi } from "@/lib/vergiHesap";
 
 type Kalem = { anahtar: number; aciklama: string; miktar: string; fiyat: string; kdv: string; urun?: UrunBulunan | null };
 
@@ -26,10 +27,12 @@ export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: {
   const [tutarElle, setTutarElle] = useState(false);
 
   const hesap = kalemHesapla(
-    kalemler.map((k) => ({ aciklama: k.aciklama, miktar: sayi(k.miktar) ?? 0, birimFiyat: sayi(k.fiyat) ?? 0, kdvOrani: Number(k.kdv), otvOrani: k.urun?.otvOrani ?? 0 })).filter((k) => k.miktar > 0 && k.birimFiyat > 0),
+    kalemler.map((k) => ({ aciklama: k.aciklama, miktar: sayi(k.miktar) ?? 0, birimFiyat: sayi(k.fiyat) ?? 0, kdvOrani: Number(k.kdv), otvOrani: k.urun?.otvOrani ?? 0, ekler: k.urun?.ekVergiler ?? [] })).filter((k) => k.miktar > 0 && k.birimFiyat > 0),
   );
   // tek ödeme satırı varsa ve elle değiştirilmediyse tutar toplamı izler
-  const odemeListesi = odemeler.length === 1 && !tutarElle ? [{ ...odemeler[0], tutar: hesap.genelToplam ? String(hesap.genelToplam).replace(".", ",") : "" }] : odemeler;
+  // stopaj/tevkifat gibi kesintiler alıcıda kalır: beklenen ödeme tahsil edilecek tutardır
+  const beklenen = hesap.tahsilEdilecek;
+  const odemeListesi = odemeler.length === 1 && !tutarElle ? [{ ...odemeler[0], tutar: beklenen ? String(beklenen).replace(".", ",") : "" }] : odemeler;
 
   const odemeToplam = odemeListesi.reduce((t, o) => t + (sayi(o.tutar) ?? 0), 0);
 
@@ -93,6 +96,7 @@ export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: {
                 <p className={`mt-0.5 text-xs ${az ? "text-red-600" : "text-zinc-500"}`}>
                   <span className="font-mono">{k.urun.kod}</span>
                   {k.urun.tur === "HIZMET" ? " · hizmet" : ` · stokta ${k.urun.miktar.toLocaleString("tr-TR")} ${k.urun.birim}${az ? " (yetersiz)" : ""}`}
+                  {k.urun.ekVergiler?.map((v) => ` · ${vergiEtiketi(v)}`)}
                 </p>
               )}
               </div>
@@ -102,11 +106,16 @@ export function HizliSatisFormu({ firmalar, teklif, kdvOranlari }: { firmalar: {
         {h.kalemler && <p className="mt-2 text-xs text-red-600">{h.kalemler}</p>}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <Buton type="button" tur="ikincil" onClick={() => setKalemler((l) => [...l, bosKalem()])}>Satır ekle</Buton>
-          <span className="text-xs text-zinc-500">Vergiler hariç {tl(hesap.matrah)}{hesap.otv > 0 && ` · ÖTV ${tl(hesap.otv)}`} · KDV {tl(hesap.kdv)}</span>
+          <span className="text-xs text-zinc-500">
+            Vergiler hariç {tl(hesap.matrah)}{hesap.otv > 0 && ` · ÖTV ${tl(hesap.otv)}`}
+            {hesap.vergiOzeti.filter((v) => !v.kesinti).map((v) => ` · ${v.ad} ${tl(v.tutar)}`)} · KDV {tl(hesap.kdv)}
+            {hesap.vergiOzeti.filter((v) => v.kesinti).map((v) => ` · ${v.ad} −${tl(v.tutar)}`)}
+            {hesap.kesinti > 0 && ` · Tahsil edilecek ${tl(hesap.tahsilEdilecek)}`}
+          </span>
         </div>
       </Kart>
 
-      <Kart baslik="Ödeme" sag={<span className={`text-sm ${Math.abs(hesap.genelToplam - odemeToplam) >= 0.01 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(hesap.genelToplam)}</span>}>
+      <Kart baslik="Ödeme" sag={<span className={`text-sm ${Math.abs(beklenen - odemeToplam) >= 0.01 ? "text-amber-600" : "text-zinc-600"}`}>{tl(odemeToplam)} / {tl(beklenen)}</span>}>
         <OdemeSatirlari odemeler={odemeListesi} guncelle={odemeGuncelle} sil={(a) => setOdemeler(odemeListesi.filter((x) => x.anahtar !== a))} />
         {h.odemeler && <p className="mt-2 text-xs text-red-600">{h.odemeler}</p>}
         <Buton

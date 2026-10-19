@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Alan, Girdi, Kart, MetinAlani } from "@/components/ui";
+import { Alan, Girdi, Kart, MetinAlani, Secim } from "@/components/ui";
 import { BELGE_AYARLARI, belgeAyarlari, type BelgeAyarAnahtari } from "@/lib/belgeAyarlari";
-import { aktiflikDegistir, belgeAyarKaydet, urunTanimAdDegistir, urunTanimEkle } from "./eylem";
+import { VERGI_HESAP_AD, vergiDegerYaz, vergiDegerYazi, type VergiHesapTuru } from "@/lib/vergiHesap";
+import { aktiflikDegistir, belgeAyarKaydet, urunTanimAdDegistir, urunTanimEkle, vergiTanimKaydet } from "./eylem";
 import { AktiflikButonu, AyarFormu } from "./Formlar";
 
 export function Liste({ ogeler }: { ogeler: { id: number; ad: string; aktif?: boolean; sag?: ReactNode }[] }) {
@@ -56,6 +57,44 @@ export function TanimKarti({ tur, baslik, ipucu, liste }: { tur: "urunGrubu" | "
         {!liste.length && <li className="text-sm text-zinc-500">Henüz kayıt yok.</li>}
       </ul>
       <AyarFormu eylem={urunTanimEkle.bind(null, tur)}><Girdi name="ad" placeholder={ipucu} className="w-auto flex-1 uppercase" required /></AyarFormu>
+    </Kart>
+  );
+}
+
+type VergiSatiri = { id: number; ad: string; kod: string | null; hesap: VergiHesapTuru; deger: number; kdvMatrahina: boolean; kesinti: boolean; aciklama: string | null; aktif: boolean };
+
+function VergiAlanlari({ v }: { v?: VergiSatiri }) {
+  return (
+    <>
+      <Girdi name="ad" defaultValue={v?.ad} placeholder="Ad (ör. ÖİV)" className="!w-40" required aria-label="Ad" />
+      <Girdi name="kod" defaultValue={v?.kod ?? ""} placeholder="GİB kodu" className="!w-24" aria-label="GİB vergi kodu" />
+      <Secim name="hesap" defaultValue={v?.hesap ?? "YUZDE"} className="!w-52" aria-label="Hesap şekli">
+        {(Object.keys(VERGI_HESAP_AD) as VergiHesapTuru[]).map((h) => <option key={h} value={h}>{VERGI_HESAP_AD[h]}</option>)}
+      </Secim>
+      <Girdi name="deger" defaultValue={v ? String(vergiDegerYaz(v.hesap, v.deger)).replace(".", ",") : ""} placeholder="% ya da ₺" inputMode="decimal" className="!w-24" required aria-label="Oran ya da tutar" />
+      <label className="flex items-center gap-1 text-xs text-zinc-600"><input type="checkbox" name="kdvMatrahina" defaultChecked={v?.kdvMatrahina} /> KDV matrahına girer</label>
+      <label className="flex items-center gap-1 text-xs text-zinc-600"><input type="checkbox" name="kesinti" defaultChecked={v?.kesinti} /> Kesinti (tahsilattan düşer)</label>
+    </>
+  );
+}
+
+/** KDV ve ÖTV dışındaki vergiler: ÖİV, konaklama, damga, maktu vergiler, tevkifat, stopaj */
+export function VergiTanimKarti({ liste }: { liste: VergiSatiri[] }) {
+  return (
+    <Kart baslik="Diğer vergiler" className="lg:col-span-2" sag={<span className="text-xs text-zinc-500">Ürün kartında seçilir; oran ve kodları mali müşavirinizle teyit edin</span>}>
+      <ul className="mb-4 space-y-2">
+        {liste.map((v) => (
+          <li key={v.id} className={`flex items-start gap-2 ${v.aktif ? "" : "opacity-50"}`}>
+            <div className="flex-1">
+              <AyarFormu eylem={vergiTanimKaydet.bind(null, v.id)} buton="Kaydet"><VergiAlanlari v={v} /></AyarFormu>
+              <p className="mt-1 text-xs text-zinc-500">{vergiDegerYazi(v.hesap, v.deger)} · {v.kdvMatrahina ? "KDV matrahına girer" : v.kesinti ? "toplama girmez, tahsil edilecekten düşer" : "KDV matrahına girmez, toplama eklenir"}</p>
+            </div>
+            <div className="pt-2"><AktiflikButonu aktif={v.aktif} eylem={aktiflikDegistir.bind(null, "vergiTanimi", v.id)} /></div>
+          </li>
+        ))}
+        {!liste.length && <li className="text-sm text-zinc-500">Henüz tanım yok. Örnek: ÖİV (%, KDV matrahına girer), konaklama vergisi (%), maktu vergi (birim başına ₺), KDV tevkifatı (5/10 için 50), stopaj (%, kesinti).</li>}
+      </ul>
+      <AyarFormu eylem={vergiTanimKaydet.bind(null, null)} buton="Vergi ekle"><VergiAlanlari /></AyarFormu>
     </Kart>
   );
 }

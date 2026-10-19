@@ -7,7 +7,7 @@ import type { Hatalar } from "@/lib/dogrulama/cari";
 import { odemeSatirlari } from "@/lib/dogrulama/satis";
 import { para, sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
-import { iadeKalemleri, satisKalani } from "@/lib/satis/iade";
+import { iadeCariTutari, iadeKalemleri, satisKalani } from "@/lib/satis/iade";
 import { stokHareketYaz } from "@/lib/stok";
 
 export type IadeDurumu = { hatalar?: Hatalar; genel?: string } | undefined;
@@ -66,7 +66,7 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
         kalemler: { create: kalem.satirlar.map((x) => ({ satisKalemiId: x.satisKalemiId, miktar: dec(x.miktar), tutar: dec(x.tutar) })) },
       },
     });
-    await tx.cariHareket.create({ data: { cariId: s.cariId, tarih: iade.tarih, alacak: dec(tutar), aciklama: `İade ${iade.iadeNo} (satış ${s.formNo})`, satisId, iadeId: iade.id } });
+    await tx.cariHareket.create({ data: { cariId: s.cariId, tarih: iade.tarih, alacak: dec(iadeCariTutari(tutar, Number(s.genelToplam), Number(s.kesintiToplam))), aciklama: `İade ${iade.iadeNo} (satış ${s.formNo})`, satisId, iadeId: iade.id } });
     for (const g of geriOdemeler) {
       const go = await tx.geriOdeme.create({ data: { iadeId: iade.id, yontem: g.yontem, tutar: dec(g.tutar), aciklama: g.aciklama } });
       await tx.cariHareket.create({ data: { cariId: s.cariId, tarih: iade.tarih, borc: dec(g.tutar), aciklama: `İade ödemesi ${iade.iadeNo} (satış ${s.formNo})`, satisId, iadeId: iade.id, geriOdemeId: go.id } });
@@ -87,7 +87,7 @@ export async function iadeKaydet(satisId: number, _: IadeDurumu, form: FormData)
     }
     if (kalem.tamami) await tx.satis.update({ where: { id: satisId }, data: { durum: "IADE" } });
     await tx.denetimKaydi.create({
-      data: { kullanici: k.kullaniciAdi, islem: "IADE", tablo: "Satis", kayitId: String(satisId), detay: { iadeNo: iade.iadeNo, tutar, neden, geriOdeme: geriToplam, kalan: satisKalani({ genelToplam: Number(s.genelToplam), iade: s.iadeler.reduce((a, i) => a + Number(i.tutar), 0) + tutar, tahsil, geriOdeme: oncekiGeri + geriToplam }) } },
+      data: { kullanici: k.kullaniciAdi, islem: "IADE", tablo: "Satis", kayitId: String(satisId), detay: { iadeNo: iade.iadeNo, tutar, neden, geriOdeme: geriToplam, kalan: satisKalani({ genelToplam: Number(s.genelToplam), iade: s.iadeler.reduce((a, i) => a + Number(i.tutar), 0) + tutar, tahsil, geriOdeme: oncekiGeri + geriToplam, kesinti: Number(s.kesintiToplam) }) } },
     });
     return iade.id;
   });

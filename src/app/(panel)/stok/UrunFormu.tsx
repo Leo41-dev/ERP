@@ -4,9 +4,10 @@ import { sifirlamadan } from "@/components/form";
 import { Alan, Buton, Girdi, HataKutusu, Kart, MetinAlani, Secim } from "@/components/ui";
 import { BIRIMLER } from "@/lib/dogrulama/urun";
 import { URUN_TUR_AD } from "@/lib/bicim";
-import type { Tanim } from "@/lib/stokTanim";
+import type { Tanim, VergiSecenek } from "@/lib/stokTanim";
 import { fiyattanKarOrani, marjliFiyat } from "@/lib/stokHesap";
 import { secenekli } from "@/lib/vergi";
+import { vergiDegerYaz, vergiDegerYazi, vergiDegerOku, type EkVergi } from "@/lib/vergiHesap";
 import { sayi } from "@/lib/normalize";
 import { tl, yuzde } from "@/lib/bicim";
 import type { UrunDurum } from "./eylem";
@@ -16,7 +17,7 @@ type Alanlar = "ad" | "tur" | "kod" | "barkod" | "grupId" | "markaId" | "birim" 
 export type UrunVarsayilan = Partial<Record<Alanlar, string>> & { aktif?: boolean };
 
 
-export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoster, yonetici, bazMaliyet = null, kdvOranlari, otvOranlari }: {
+export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoster, yonetici, bazMaliyet = null, kdvOranlari, otvOranlari, vergiTanimlari, seciliVergiler = [] }: {
   eylem: Eylem;
   v?: UrunVarsayilan;
   gruplar: Tanim[];
@@ -27,6 +28,8 @@ export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoste
   bazMaliyet?: number | null; // alış fiyatı yoksa kâr oranında kullanılan ortalama maliyet
   kdvOranlari: string[];
   otvOranlari: string[];
+  vergiTanimlari: VergiSecenek[];
+  seciliVergiler?: { vergiId: number; deger: number }[];
 }) {
   const [durum, gonder, bekliyor] = useActionState(eylem, undefined);
   const h = durum?.hatalar ?? {};
@@ -63,7 +66,7 @@ export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoste
         </p>
       </Kart>
       <Kart baslik="Fiyat ve vergiler">
-        <FiyatAlanlari v={v} h={h} maliyetGoster={maliyetGoster} bazMaliyet={bazMaliyet} kdvOranlari={kdvOranlari} otvOranlari={otvOranlari} />
+        <FiyatAlanlari v={v} h={h} maliyetGoster={maliyetGoster} bazMaliyet={bazMaliyet} kdvOranlari={kdvOranlari} otvOranlari={otvOranlari} vergiTanimlari={vergiTanimlari} seciliVergiler={seciliVergiler} />
       </Kart>
       <Kart>
         <Alan etiket="Not"><MetinAlani name="not" defaultValue={v.not} /></Alan>
@@ -81,7 +84,24 @@ export function UrunFormu({ eylem, v = {}, gruplar, markalar, yeni, maliyetGoste
 type Hatalar = Partial<Record<string, string>>;
 
 /** Satış fiyatı ya elle girilir ya da son alış fiyatı üzerine kâr oranıyla hesaplanır; vergiler dahil gösterilir. */
-function FiyatAlanlari({ v, h, maliyetGoster, bazMaliyet, kdvOranlari, otvOranlari }: { v: UrunVarsayilan; h: Hatalar; maliyetGoster: boolean; bazMaliyet: number | null; kdvOranlari: string[]; otvOranlari: string[] }) {
+function FiyatAlanlari({ v, h, maliyetGoster, bazMaliyet, kdvOranlari, otvOranlari, vergiTanimlari, seciliVergiler }: {
+  v: UrunVarsayilan;
+  h: Hatalar;
+  maliyetGoster: boolean;
+  bazMaliyet: number | null;
+  kdvOranlari: string[];
+  otvOranlari: string[];
+  vergiTanimlari: VergiSecenek[];
+  seciliVergiler: { vergiId: number; deger: number }[];
+}) {
+  // seçili ek vergi → ürüne özel değer (ekranda yazıldığı biçimde; boşsa tanımın varsayılanı)
+  const [ekSecim, setEkSecim] = useState<Record<number, string>>(() =>
+    Object.fromEntries(seciliVergiler.map((x) => { const t = vergiTanimlari.find((y) => y.id === x.vergiId); return [x.vergiId, t ? String(vergiDegerYaz(t.hesap, x.deger)).replace(".", ",") : ""]; })),
+  );
+  const ekler: EkVergi[] = vergiTanimlari.filter((t) => t.id in ekSecim).map((t) => {
+    const n = sayi(ekSecim[t.id]);
+    return { ad: t.ad, hesap: t.hesap, deger: n === null ? t.deger : vergiDegerOku(t.hesap, n), kdvMatrahina: t.kdvMatrahina, kesinti: t.kesinti };
+  });
   const [tip, setTip] = useState(v.fiyatTipi ?? "SABIT");
   const [fiyat, setFiyat] = useState(v.satisFiyati ?? "");
   const [kar, setKar] = useState(v.karOrani ?? "");
@@ -90,8 +110,8 @@ function FiyatAlanlari({ v, h, maliyetGoster, bazMaliyet, kdvOranlari, otvOranla
   const [otv, setOtv] = useState(v.otvOrani ?? "0");
   const baz = sayi(alis) || bazMaliyet;
   const k = Number(kdv), o = Number(otv);
-  const hesaplanan = tip === "MARJ" && baz && sayi(kar) !== null ? marjliFiyat(baz, sayi(kar)! / 100, k, o) : null;
-  const mevcutKar = tip === "SABIT" && sayi(fiyat) ? fiyattanKarOrani(sayi(fiyat)!, baz, k, o) : null;
+  const hesaplanan = tip === "MARJ" && baz && sayi(kar) !== null ? marjliFiyat(baz, sayi(kar)! / 100, k, o, ekler) : null;
+  const mevcutKar = tip === "SABIT" && sayi(fiyat) ? fiyattanKarOrani(sayi(fiyat)!, baz, k, o, ekler) : null;
   const kilitli = !maliyetGoster && v.fiyatTipi === "MARJ"; // maliyet görmeyen kullanıcı kâr oranıyla hesaplanan fiyatı değiştiremez
   return (
     <div className="space-y-4">
@@ -136,6 +156,43 @@ function FiyatAlanlari({ v, h, maliyetGoster, bazMaliyet, kdvOranlari, otvOranla
           </Secim>
         </Alan>
       </div>
+      {vergiTanimlari.length > 0 && (
+        <div>
+          <input type="hidden" name="vergiFormu" value="1" />
+          <p className="mb-2 text-sm font-medium">Diğer vergiler</p>
+          <div className="grid gap-2 md:grid-cols-2">
+            {vergiTanimlari.map((t) => {
+              const secili = t.id in ekSecim;
+              return (
+                <div key={t.id} className="flex items-center gap-2 text-sm">
+                  <label className="flex flex-1 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="vergi"
+                      value={t.id}
+                      checked={secili}
+                      onChange={(e) => setEkSecim((x) => { const y = { ...x }; if (e.target.checked) y[t.id] = ""; else delete y[t.id]; return y; })}
+                    />
+                    {t.ad}{t.aktif ? "" : " (pasif)"}{t.kesinti && <span className="text-xs text-zinc-500">kesinti</span>}
+                  </label>
+                  {secili && (
+                    <Girdi
+                      name={`vergi_${t.id}`}
+                      value={ekSecim[t.id]}
+                      onChange={(e) => setEkSecim((x) => ({ ...x, [t.id]: e.target.value }))}
+                      placeholder={vergiDegerYazi(t.hesap, t.deger)}
+                      inputMode="decimal"
+                      className="!w-32"
+                      aria-label={`${t.ad} oranı`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {h.vergiler && <p className="mt-1 text-xs text-red-700">{h.vergiler}</p>}
+        </div>
+      )}
       <p className="text-xs text-zinc-500">
         {kilitli
           ? "Bu ürünün fiyatı kâr oranıyla hesaplanıyor; değiştirmek için yöneticiye başvurun."

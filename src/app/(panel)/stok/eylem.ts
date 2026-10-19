@@ -9,6 +9,7 @@ import { sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
 import { stokHareketYaz, yeniUrunKodu } from "@/lib/stok";
 import { marjliFiyat } from "@/lib/stokHesap";
+import { URUN_VERGILERI, ekVergi, formVergileri } from "@/lib/urunVergi";
 
 export type UrunDurum = { hatalar?: Hatalar; genel?: string; tamam?: string } | undefined;
 
@@ -26,11 +27,14 @@ export async function urunKaydet(id: number | null, _: UrunDurum, form: FormData
   }
   if (veri.grupId && !(await db.urunGrubu.findUnique({ where: { id: veri.grupId }, select: { id: true } }))) return { hatalar: { grupId: "Grup bulunamadı." } };
   if (veri.markaId && !(await db.urunMarkasi.findUnique({ where: { id: veri.markaId }, select: { id: true } }))) return { hatalar: { markaId: "Marka bulunamadı." } };
-  const eski = id ? await db.urun.findUnique({ where: { id }, select: { tur: true, miktar: true, alisFiyati: true, ortMaliyet: true, fiyatTipi: true, karOrani: true } }) : null;
+  const eski = id ? await db.urun.findUnique({ where: { id }, select: { tur: true, miktar: true, alisFiyati: true, ortMaliyet: true, fiyatTipi: true, karOrani: true, ...URUN_VERGILERI } }) : null;
   if (id) {
     if (!eski) return { genel: "Ürün bulunamadı." };
     if (veri.tur === "HIZMET" && eski.tur !== "HIZMET" && Number(eski.miktar) !== 0) return { hatalar: { tur: "Stokta miktarı olan ürün hizmete çevrilemez." } };
   }
+  const secilen = await formVergileri(db, form);
+  if (secilen && "hata" in secilen) return { hatalar: { vergiler: secilen.hata } };
+  const ekler = (secilen ? secilen.vergiler : (eski?.vergiler ?? [])).map(ekVergi);
   // kâr oranıyla fiyat: baz son alış fiyatı (formdaki ya da kayıtlı), yoksa ortalama maliyet
   // fiyat alanlarını görmeyen kullanıcı vergi oranını değiştirirse kayıtlı kâr oranıyla yeniden hesaplanır
   let satisFiyati = veri.satisFiyati;
@@ -39,7 +43,7 @@ export async function urunKaydet(id: number | null, _: UrunDurum, form: FormData
   if (tip === "MARJ") {
     const baz = veri.alisFiyati ?? (eski?.alisFiyati ? Number(eski.alisFiyati) : eski?.ortMaliyet ? Number(eski.ortMaliyet) : null);
     if (!baz) return { hatalar: { karOrani: "Kâr oranıyla fiyat için alış fiyatı yazılmalı." } };
-    satisFiyati = marjliFiyat(baz, kar, veri.kdvOrani, veri.otvOrani);
+    satisFiyati = marjliFiyat(baz, kar, veri.kdvOrani, veri.otvOrani, ekler);
   }
   const { fiyatTipi, ...kalan } = veri;
   const data = {
@@ -58,6 +62,10 @@ export async function urunKaydet(id: number | null, _: UrunDurum, form: FormData
   if (tip === "SABIT" && !fiyatTipi && form.get("satisFiyati") === null) delete (data as Partial<typeof data>).satisFiyati;
   const u = await db.$transaction(async (tx) => {
     const u = id ? await tx.urun.update({ where: { id }, data }) : await tx.urun.create({ data });
+    if (secilen) {
+      await tx.urunVergi.deleteMany({ where: { urunId: u.id } });
+      if (secilen.vergiler.length) await tx.urunVergi.createMany({ data: secilen.vergiler.map((x) => ({ urunId: u.id, vergiId: x.vergi.id, deger: new Prisma.Decimal(x.deger) })) });
+    }
     await tx.denetimKaydi.create({ data: { kullanici: k.kullaniciAdi, islem: id ? "GUNCELLE" : "EKLE", tablo: "Urun", kayitId: String(u.id) } });
     return u;
   });

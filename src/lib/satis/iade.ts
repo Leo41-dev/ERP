@@ -19,7 +19,13 @@ export function iadeKalemleri(kalemler: IadeKalemDurumu[], secim: Record<number,
   return { satirlar, toplam: para(satirlar.reduce((t, s) => t + s.tutar, 0)), tamami };
 }
 
-/** Satışın kalan alacağı: satış − iadeler − tahsilat + müşteriye geri ödenen. Eksi ise müşteriye borçluyuz. */
-export function satisKalani(x: { genelToplam: number; iade: number; tahsil: number; geriOdeme: number }) {
-  return para(x.genelToplam - x.iade - x.tahsil + x.geriOdeme);
+/** Kesintili satışta (stopaj, tevkifat) cariye yazılan iade: iade tutarının alıcıda kalan kesinti payı düşülmüş hali */
+export function iadeCariTutari(iade: number, genelToplam: number, kesinti = 0) {
+  return genelToplam > 0 ? para(iade * (1 - kesinti / genelToplam)) : iade;
+}
+
+/** Satışın kalan alacağı: tahsil edilecek − iadeler − tahsilat + müşteriye geri ödenen. Eksi ise müşteriye borçluyuz. */
+export function satisKalani(x: { genelToplam: number; iade: number; tahsil: number; geriOdeme: number; kesinti?: number }) {
+  const k = x.kesinti ?? 0;
+  return para(x.genelToplam - k - iadeCariTutari(x.iade, x.genelToplam, k) - x.tahsil + x.geriOdeme);
 }

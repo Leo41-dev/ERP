@@ -11,6 +11,7 @@ import { faturaUrunOku, urunEslemeAnahtari, type FaturaUrun } from "@/lib/fatura
 import { yetkiIste } from "@/lib/oturum";
 import { stokHareketYaz, yeniUrunKodu } from "@/lib/stok";
 import { marjliFiyat } from "@/lib/stokHesap";
+import { URUN_VERGILERI, ekVergi } from "@/lib/urunVergi";
 import type { UrunBulunan } from "../ara/route";
 
 export type GirisDurum = { hatalar?: Hatalar; genel?: string; uyari?: string; onayIste?: boolean } | undefined;
@@ -123,8 +124,8 @@ export async function girisKaydet(_: GirisDurum, form: FormData): Promise<GirisD
         }
       } else {
         // kâr oranıyla fiyatlanan üründe yeni alış fiyatı satış fiyatını da günceller
-        const u = await tx.urun.findUnique({ where: { id: urunId }, select: { fiyatTipi: true, karOrani: true, kdvOrani: true, otvOrani: true } });
-        const satis = u?.fiyatTipi === "MARJ" && u.karOrani !== null ? { satisFiyati: dec(marjliFiyat(x.birimFiyat, Number(u.karOrani), Number(u.kdvOrani), Number(u.otvOrani))) } : {};
+        const u = await tx.urun.findUnique({ where: { id: urunId }, select: { fiyatTipi: true, karOrani: true, kdvOrani: true, otvOrani: true, ...URUN_VERGILERI } });
+        const satis = u?.fiyatTipi === "MARJ" && u.karOrani !== null ? { satisFiyati: dec(marjliFiyat(x.birimFiyat, Number(u.karOrani), Number(u.kdvOrani), Number(u.otvOrani), u.vergiler.map(ekVergi))) } : {};
         await tx.urun.update({ where: { id: urunId }, data: { alisFiyati: dec(x.birimFiyat), ...satis } });
       }
       await tx.stokGirisKalemi.create({

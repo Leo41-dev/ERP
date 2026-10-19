@@ -4,15 +4,16 @@ import { yuzde } from "@/lib/bicim";
 import { db } from "@/lib/db";
 import { aktiflikDegistir, kdvEkle, maddeEkle, maddeGuncelle, otvEkle } from "../eylem";
 import { AktiflikButonu, AyarFormu } from "../Formlar";
-import { BelgeAyarKarti, Liste } from "../ortak";
+import { BelgeAyarKarti, Liste, VergiTanimKarti } from "../ortak";
 
 export const metadata = { title: "Ayarlar · Satış" };
 
 export default async function SatisAyarlari() {
-  const [kdvler, otvler, maddeler] = await Promise.all([
+  const [kdvler, otvler, maddeler, vergiler] = await Promise.all([
     db.kdvOrani.findMany({ orderBy: { oran: "asc" } }),
     db.otvOrani.findMany({ orderBy: { oran: "asc" } }),
     db.kontrolMaddesi.findMany({ orderBy: { sira: "asc" } }),
+    db.vergiTanimi.findMany({ orderBy: { ad: "asc" } }),
   ]);
   return (
     <>
@@ -26,6 +27,7 @@ export default async function SatisAyarlari() {
           <Liste ogeler={otvler.map((x) => ({ id: x.id, ad: yuzde(x.oran), aktif: x.aktif, sag: <AktiflikButonu aktif={x.aktif} eylem={aktiflikDegistir.bind(null, "otvOrani", x.id)} /> }))} />
           <AyarFormu eylem={otvEkle}><Girdi name="oran" placeholder="Oran, % (ör. 37)" inputMode="decimal" className="w-auto flex-1" required /></AyarFormu>
         </Kart>
+        <VergiTanimKarti liste={vergiler.map((v) => ({ ...v, deger: Number(v.deger) }))} />
         <Kart baslik="Satış hedefleri">
           <p className="text-sm text-zinc-600">Her satıcı için ay ay araç ve ciro hedefi. <Link href="/ayarlar/hedefler" className="underline">Hedefleri düzenle</Link></p>
         </Kart>

@@ -13,9 +13,9 @@ const yaz = (v: unknown) => (v === null || v === undefined ? undefined : String(
 export default async function UrunDuzenle({ params }: { params: Promise<{ id: string }> }) {
   const k = await yetkiIste("DEPO", "MUHASEBE");
   const id = Number((await params).id);
-  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id } }) : null;
+  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id }, include: { vergiler: true } }) : null;
   if (!u || u.tur === "ARAC") notFound();
-  const tanim = await urunTanimlari(db, u);
+  const tanim = await urunTanimlari(db, { ...u, vergiIdler: u.vergiler.map((x) => x.vergiId) });
   return (
     <>
       <SayfaBaslik baslik={`${u.kod} · düzenle`} />
@@ -23,6 +23,7 @@ export default async function UrunDuzenle({ params }: { params: Promise<{ id: st
         eylem={urunKaydet.bind(null, u.id)}
         {...tanim}
         yonetici={k.rol === "YONETICI"}
+        seciliVergiler={u.vergiler.map((x) => ({ vergiId: x.vergiId, deger: Number(x.deger) }))}
         bazMaliyet={u.ortMaliyet === null ? null : Number(u.ortMaliyet)}
         maliyetGoster={maliyetGorur(k)}
         v={{

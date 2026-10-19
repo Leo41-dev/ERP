@@ -84,6 +84,14 @@ enum StokHareketTur {
   IPTAL // iptal edilen satışın stoğa dönüşü
 }
 
+/// Vergi motoru: hesap şekilleri (src/lib/vergiHesap.ts)
+enum VergiHesap {
+  YUZDE
+  BIRIM_TUTAR
+  SABIT_TUTAR
+  KDV_TEVKIFAT
+}
+
 /// Ürün satış fiyatı elle mi girilir, yoksa son alış fiyatı üzerine kâr oranıyla mı hesaplanır
 enum FiyatTipi {
   SABIT
@@ -175,6 +183,45 @@ model Konum {
 }
 
 // ÖTV elle seçilir; bu tablo seçilebilecek oranların listesidir.
+/// KDV ve ÖTV dışındaki vergiler (ÖİV, konaklama, damga, maktu vergiler, tevkifat, stopaj). Oran ve kodu işletme girer.
+model VergiTanimi {
+  id           Int         @id @default(autoincrement())
+  ad           String      @unique
+  kod          String? // GİB vergi kodu
+  hesap        VergiHesap
+  deger        Decimal     @db.Decimal(12, 4) // varsayılan: yüzde/tevkifat için oran (0,02), tutar bazlıda TL
+  kdvMatrahina Boolean     @default(false)
+  kesinti      Boolean     @default(false) // toplama girmez, tahsil edilecekten düşer
+  aciklama     String?
+  aktif        Boolean     @default(true)
+  urunler      UrunVergi[]
+}
+
+model UrunVergi {
+  urunId  Int
+  urun    Urun        @relation(fields: [urunId], references: [id], onDelete: Cascade)
+  vergiId Int
+  vergi   VergiTanimi @relation(fields: [vergiId], references: [id])
+  deger   Decimal     @db.Decimal(12, 4)
+
+  @@id([urunId, vergiId])
+}
+
+/// Satış anında hesaplanan ek vergilerin kopyası; tanım sonradan değişse de belge aynı kalır
+model SatisKalemiVergi {
+  id           Int         @id @default(autoincrement())
+  kalemId      Int
+  kalem        SatisKalemi @relation(fields: [kalemId], references: [id], onDelete: Cascade)
+  vergiId      Int?
+  ad           String
+  kod          String?
+  hesap        VergiHesap
+  deger        Decimal     @db.Decimal(12, 4)
+  kdvMatrahina Boolean
+  kesinti      Boolean
+  tutar        Decimal     @db.Decimal(14, 2)
+}
+
 model KdvOrani {
   id    Int     @id @default(autoincrement())
   oran  Decimal @unique @db.Decimal(6, 4)
@@ -322,6 +369,7 @@ model Urun {
   esleme      UrunEsleme[]
   girisler    StokGirisKalemi[]
   sayimlar    SayimSatiri[]
+  vergiler    UrunVergi[]
 
   @@index([barkod])
   @@index([ad])
@@ -513,6 +561,8 @@ model Satis {
   iskontoToplam   Decimal?       @db.Decimal(14, 2)
   otvToplam       Decimal?       @db.Decimal(14, 2)
   kdvToplam       Decimal?       @db.Decimal(14, 2)
+  ekVergiToplam   Decimal        @default(0) @db.Decimal(14, 2) // KDV ve ÖTV dışındaki vergiler
+  kesintiToplam   Decimal        @default(0) @db.Decimal(14, 2) // tevkifat, stopaj: tahsil edilecekten düşer
   // Satıcının elle belirlediği tutar. Fatura bu tutarla kesilir; ayrı bir fiyat alanı yoktur.
   genelToplam     Decimal        @db.Decimal(14, 2)
   teslimTarihi    DateTime?      @db.Date
@@ -556,6 +606,7 @@ model SatisKalemi {
   kdvOrani     Decimal      @default(0.2) @db.Decimal(6, 4)
   tutar        Decimal      @db.Decimal(14, 2) // vergiler dahil satır toplamı
   iadeler      IadeKalemi[]
+  vergiler     SatisKalemiVergi[]
 }
 
 // Satıştan iade. Kayıtlar silinmez: cariye alacak, müşteriye yapılan geri ödeme için borç yazılır.

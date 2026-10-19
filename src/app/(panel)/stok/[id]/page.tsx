@@ -5,6 +5,8 @@ import { STOK_HAREKET_AD, URUN_TUR_AD, miktar, tarihSaat, tl, yuzde } from "@/li
 import { db } from "@/lib/db";
 import { maliyetGorur, yetkiIste } from "@/lib/oturum";
 import { kritikDurum, fiyattanKarOrani } from "@/lib/stokHesap";
+import { URUN_VERGILERI, ekVergi } from "@/lib/urunVergi";
+import { vergiEtiketi } from "@/lib/vergiHesap";
 import { stokDuzelt } from "../eylem";
 import { StokDuzeltFormu } from "./StokDuzeltFormu";
 
@@ -14,7 +16,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
   const k = await yetkiIste();
   const id = Number((await params).id);
   const p = await searchParams;
-  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id }, include: { grup: true, marka: true } }) : null;
+  const u = Number.isInteger(id) ? await db.urun.findUnique({ where: { id }, include: { grup: true, marka: true, ...URUN_VERGILERI } }) : null;
   if (!u || u.tur === "ARAC") notFound();
   const maliyet = maliyetGorur(k);
   const yonetebilir = k.rol === "YONETICI" || k.rol === "DEPO" || k.rol === "MUHASEBE";
@@ -32,7 +34,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
   const m = Number(u.miktar);
   const d = u.tur === "HIZMET" ? null : DURUM[kritikDurum(m, u.kritikStok === null ? null : Number(u.kritikStok))];
   const aylikSatis = -Number(satis90._sum.miktar ?? 0) / 3;
-  const marj = u.satisFiyati ? fiyattanKarOrani(Number(u.satisFiyati), u.ortMaliyet === null ? null : Number(u.ortMaliyet), Number(u.kdvOrani), Number(u.otvOrani)) : null;
+  const marj = u.satisFiyati ? fiyattanKarOrani(Number(u.satisFiyati), u.ortMaliyet === null ? null : Number(u.ortMaliyet), Number(u.kdvOrani), Number(u.otvOrani), u.vergiler.map(ekVergi)) : null;
 
   const belge = (h: (typeof hareketler)[number]) => {
     if (h.satis) return <Link href={`/satislar/${h.satis.id}`} className="hover:underline">Satış {h.satis.formNo}{h.iade ? ` · iade ${h.iade.iadeNo}` : ""} · {h.satis.cari.unvan}</Link>;
@@ -54,7 +56,7 @@ export default async function UrunKarti({ params, searchParams }: { params: Prom
         <Bilgi
           ad="Satış fiyatı (vergiler dahil)"
           deger={tl(u.satisFiyati)}
-          ek={<span className="text-xs text-zinc-500">KDV {yuzde(u.kdvOrani)}{Number(u.otvOrani) > 0 && ` · ÖTV ${yuzde(u.otvOrani)}`}{maliyet && u.fiyatTipi === "MARJ" && ` · kâr oranı ${yuzde(u.karOrani)}`}</span>}
+          ek={<span className="text-xs text-zinc-500">KDV {yuzde(u.kdvOrani)}{Number(u.otvOrani) > 0 && ` · ÖTV ${yuzde(u.otvOrani)}`}{u.vergiler.map((v) => ` · ${vergiEtiketi({ ...v.vergi, deger: Number(v.deger) })}${v.vergi.aktif ? "" : " (pasif)"}`)}{maliyet && u.fiyatTipi === "MARJ" && ` · kâr oranı ${yuzde(u.karOrani)}`}</span>}
         />
         {maliyet && <Bilgi ad="Ortalama maliyet (KDV hariç)" deger={tl(u.ortMaliyet)} ek={marj !== null && <span className="text-xs text-zinc-500">Maliyet üzerine kâr {yuzde(marj)}</span>} />}
         <Bilgi ad="Aylık ortalama satış" deger={`${miktar(Math.round(aylikSatis * 10) / 10)} ${u.birim}`} ek={<span className="text-xs text-zinc-500">son 90 gün</span>} />

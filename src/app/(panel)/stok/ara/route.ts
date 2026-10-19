@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
 import { buyukHarfler } from "@/lib/stokTanim";
 import { maliyetGorur, mevcutKullanici } from "@/lib/oturum";
+import { URUN_VERGILERI, ekVergi } from "@/lib/urunVergi";
+import type { EkVergi } from "@/lib/vergiHesap";
 
 export type UrunBulunan = {
   id: number; kod: string; ad: string; birim: string; tur: string; miktar: number; satisFiyati: number | null; kdvOrani: number; otvOrani: number; barkod: string | null; alisFiyati?: number | null;
+  ekVergiler?: EkVergi[]; // hızlı satış önizlemesi için; kayıtta sunucu ürün kartından yeniden okur
 };
 
 /** Ürün arama: /stok/ara?q=yağ — barkod ya da kod tam eşleşirse ilk sırada döner */
@@ -20,6 +23,7 @@ export async function GET(istek: Request) {
       tur: { not: "ARAC" },
       OR: [{ barkod: ham }, { kod: q }, { AND: kelimeler.map((w) => ({ OR: buyukHarfler(w).flatMap((b) => [{ ad: { contains: b } }, { kod: { contains: b } }]) })) }],
     },
+    include: URUN_VERGILERI,
     orderBy: { ad: "asc" },
     take: 30,
   });
@@ -28,6 +32,7 @@ export async function GET(istek: Request) {
     .map((u) => ({
       id: u.id, kod: u.kod, ad: u.ad, birim: u.birim, tur: u.tur, miktar: Number(u.miktar), barkod: u.barkod,
       satisFiyati: u.satisFiyati === null ? null : Number(u.satisFiyati), kdvOrani: Number(u.kdvOrani), otvOrani: Number(u.otvOrani),
+      ekVergiler: u.vergiler.filter((x) => x.vergi.aktif).map(ekVergi),
       ...(maliyet || k.rol === "DEPO" ? { alisFiyati: u.ortMaliyet !== null ? Number(u.ortMaliyet) : u.alisFiyati === null ? null : Number(u.alisFiyati) } : {}),
     }))
     .sort((a, b) => Number(b.barkod === ham || b.kod === q) - Number(a.barkod === ham || a.kod === q))

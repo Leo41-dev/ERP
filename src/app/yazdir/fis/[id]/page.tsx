@@ -13,7 +13,7 @@ export default async function Fis({ params }: { params: Promise<{ id: string }> 
   const k = await yetkiIste();
   const id = Number((await params).id);
   const s = Number.isInteger(id)
-    ? await db.satis.findUnique({ where: { id }, include: { firma: true, cari: true, satici: true, kalemler: { orderBy: { id: "asc" } }, tahsilatlar: { orderBy: { tarih: "asc" } } } })
+    ? await db.satis.findUnique({ where: { id }, include: { firma: true, cari: true, satici: true, kalemler: { orderBy: { id: "asc" }, include: { vergiler: { orderBy: { id: "asc" } } } }, tahsilatlar: { orderBy: { tarih: "asc" } } } })
     : null;
   if (!s || (k.rol === "SATIS" && s.saticiId !== k.id)) notFound();
   const [ayar, varsayilan] = await Promise.all([belgeAyarlari(), s.firma ? null : db.firma.findFirst({ where: { varsayilan: true } })]);
@@ -24,11 +24,22 @@ export default async function Fis({ params }: { params: Promise<{ id: string }> 
   const kdvOzet = new Map<string, { matrah: number; kdv: number }>();
   for (const x of s.kalemler) {
     const o = yuzde(x.kdvOrani);
-    const tutar = Number(x.tutar);
+    // KDV matrahına girmeyen ek vergiler (ör. ÖİV) KDV'nin dışında kalır
+    const tutar = Number(x.tutar) - x.vergiler.filter((v) => !v.kesinti && !v.kdvMatrahina).reduce((t, v) => t + Number(v.tutar), 0);
     const matrah = tutar / (1 + Number(x.kdvOrani));
     const e = kdvOzet.get(o) ?? { matrah: 0, kdv: 0 };
     kdvOzet.set(o, { matrah: e.matrah + matrah, kdv: e.kdv + tutar - matrah });
   }
+
+  // ek vergiler ve kesintiler belge altında adına göre toplanır
+  const ekler = new Map<string, { ad: string; tutar: number; kesinti: boolean }>();
+  for (const v of s.kalemler.flatMap((x) => x.vergiler)) {
+    const a = `${v.ad}|${v.kesinti}`;
+    const e = ekler.get(a) ?? { ad: v.ad, tutar: 0, kesinti: v.kesinti };
+    e.tutar += Number(v.tutar);
+    ekler.set(a, e);
+  }
+  const ekListe = [...ekler.values()];
 
   return (
     <main className="min-h-screen bg-zinc-100 font-mono print:bg-white">
@@ -64,10 +75,17 @@ export default async function Fis({ params }: { params: Promise<{ id: string }> 
         </table>
         <div className={cizgi} />
         {Number(s.otvToplam) > 0 && <div className="flex justify-between text-zinc-700"><span>ÖTV</span><span>{tl(s.otvToplam)}</span></div>}
+        {ekListe.filter((v) => !v.kesinti).map((v) => <div key={v.ad} className="flex justify-between text-zinc-700"><span>{v.ad}</span><span>{tl(v.tutar)}</span></div>)}
         {[...kdvOzet.entries()].map(([o, v]) => (
           <div key={o} className="flex justify-between text-zinc-700"><span>KDV {o} (matrah {tl(v.matrah)})</span><span>{tl(v.kdv)}</span></div>
         ))}
         <div className="mt-1 flex justify-between text-[1.2em] font-bold"><span>TOPLAM</span><span>{tl(s.genelToplam)}</span></div>
+        {Number(s.kesintiToplam) > 0 && (
+          <>
+            {ekListe.filter((v) => v.kesinti).map((v) => <div key={v.ad} className="flex justify-between text-zinc-700"><span>{v.ad}</span><span>−{tl(v.tutar)}</span></div>)}
+            <div className="flex justify-between font-bold"><span>TAHSİL EDİLECEK</span><span>{tl(Number(s.genelToplam) - Number(s.kesintiToplam))}</span></div>
+          </>
+        )}
         <div className={cizgi} />
         {s.tahsilatlar.map((t) => (
           <div key={t.id} className="flex justify-between">

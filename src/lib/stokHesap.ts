@@ -1,4 +1,5 @@
 // Stok hesapları (saf). Veritabanı tarafı src/lib/stok.ts'de.
+import { otvEk, satirVergi, vergilerDahil, type EkVergi } from "./vergiHesap";
 
 /** 3 haneli miktar yuvarlaması (0,001 hassasiyet) */
 export const miktarYuvarla = (n: number) => Math.round(n * 1000) / 1000;
@@ -47,18 +48,16 @@ export function kodOner(onEk: string, sonNo: number) {
   return `${onEk}-${String(sonNo + 1).padStart(5, "0")}`;
 }
 
-const kurus = (n: number) => Math.round(n * 100) / 100;
-
 /**
- * Kâr oranıyla satış fiyatı (vergiler dahil): baz maliyet (KDV hariç son alış) × (1 + kâr oranı),
- * üzerine ÖTV, sonra KDV. Kâr oranı maliyet üzerinedir: %30 → maliyet × 1,30.
+ * Kâr oranıyla satış fiyatı (vergiler dahil): baz maliyet (KDV hariç son alış) × (1 + kâr oranı) matrah olur,
+ * üzerine ÖTV, ek vergiler ve KDV eklenir. Kâr oranı maliyet üzerinedir: %30 → maliyet × 1,30.
  */
-export function marjliFiyat(baz: number, karOrani: number, kdvOrani: number, otvOrani = 0) {
-  return kurus(baz * (1 + karOrani) * (1 + otvOrani) * (1 + kdvOrani));
+export function marjliFiyat(baz: number, karOrani: number, kdvOrani: number, otvOrani = 0, ekler: EkVergi[] = []) {
+  return vergilerDahil(baz * (1 + karOrani), 1, kdvOrani, [...otvEk(otvOrani), ...ekler]);
 }
 
 /** Vergiler dahil satış fiyatının maliyet üzerine kâr oranı; maliyet yoksa null */
-export function fiyattanKarOrani(fiyat: number, baz: number | null, kdvOrani: number, otvOrani = 0) {
+export function fiyattanKarOrani(fiyat: number, baz: number | null, kdvOrani: number, otvOrani = 0, ekler: EkVergi[] = []) {
   if (!baz || baz <= 0) return null;
-  return fiyat / ((1 + otvOrani) * (1 + kdvOrani)) / baz - 1;
+  return satirVergi({ tutar: fiyat, miktar: 1, kdvOrani, ekler: [...otvEk(otvOrani), ...ekler] }).matrah / baz - 1;
 }

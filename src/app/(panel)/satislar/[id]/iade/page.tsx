@@ -26,7 +26,7 @@ export default async function IadeAl({ params }: { params: Promise<{ id: string 
       <IadeFormu
         eylem={iadeKaydet.bind(null, s.id)}
         alinan={Math.round((tahsil - geri) * 100) / 100}
-        acik={satisKalani({ genelToplam: Number(s.genelToplam), iade, tahsil, geriOdeme: geri })}
+        acik={satisKalani({ genelToplam: Number(s.genelToplam), iade, tahsil, geriOdeme: geri, kesinti: Number(s.kesintiToplam) })}
         tescilli={s.kalemler.some((x) => x.arac && (x.arac.tescilDurum !== "TESCILSIZ" || x.arac.plaka))}
         kalemler={s.kalemler.map((x) => {
           const miktar = Number(x.miktar);

@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { eposta as epostaNormalize, metin, sayi } from "@/lib/normalize";
 import { yetkiIste } from "@/lib/oturum";
 import { sifreKurali, sifreOzetle } from "@/lib/sifre";
+import { vergiDegerOku, type VergiHesapTuru } from "@/lib/vergiHesap";
 
 export type AyarDurum = { hata?: string; tamam?: string } | undefined;
 
@@ -127,6 +128,40 @@ export async function kdvEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   return { tamam: "Eklendi." };
 }
 
+/* ---------- vergi tanımları ---------- */
+
+const HESAPLAR: VergiHesapTuru[] = ["YUZDE", "BIRIM_TUTAR", "SABIT_TUTAR", "KDV_TEVKIFAT"];
+
+export async function vergiTanimKaydet(id: number | null, _: AyarDurum, f: FormData): Promise<AyarDurum> {
+  const k = await yetkiIste("YONETICI");
+  const ad = yazi(f, "ad");
+  const hesap = String(f.get("hesap")) as VergiHesapTuru;
+  const yazilan = sayi(f.get("deger"));
+  if (!ad) return { hata: "Vergi adı gerekli." };
+  if (!HESAPLAR.includes(hesap)) return { hata: "Hesap şekli seçilmeli." };
+  if (yazilan === null || yazilan < 0) return { hata: "Oran ya da tutarı yazın." };
+  if ((hesap === "YUZDE" || hesap === "KDV_TEVKIFAT") && yazilan > 100) return { hata: "Oran yüzde olarak 0-100 arasında olmalı." };
+  const data = {
+    ad,
+    kod: yazi(f, "kod") || null,
+    hesap,
+    deger: vergiDegerOku(hesap, yazilan),
+    // tevkifat her zaman kesintidir ve KDV'nin üzerinden hesaplanır
+    kdvMatrahina: hesap !== "KDV_TEVKIFAT" && f.get("kdvMatrahina") === "on",
+    kesinti: hesap === "KDV_TEVKIFAT" || f.get("kesinti") === "on",
+    aciklama: yazi(f, "aciklama") || null,
+  };
+  if (data.kdvMatrahina && data.kesinti) return { hata: "Kesinti olan vergi KDV matrahına giremez." };
+  try {
+    const x = id ? await db.vergiTanimi.update({ where: { id }, data }) : await db.vergiTanimi.create({ data });
+    await denetim(k.kullaniciAdi, id ? "GUNCELLE" : "EKLE", "VergiTanimi", x.id);
+  } catch (e) {
+    return benzersiz(e, "Bu adla bir vergi var.");
+  }
+  revalidatePath("/ayarlar", "layout");
+  return { tamam: id ? "Kaydedildi." : "Eklendi." };
+}
+
 export async function maddeEkle(_: AyarDurum, f: FormData): Promise<AyarDurum> {
   const k = await yetkiIste("YONETICI");
   const ad = yazi(f, "ad");
@@ -228,7 +263,7 @@ export async function urunTanimAdDegistir(tur: UrunTanim, id: number, _: AyarDur
 }
 
 /** Konum, ÖTV oranı, kontrol maddesi, ürün grubu ve markası silinmez; pasif yapılır ki eski kayıtlar bozulmasın. */
-export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kdvOrani" | "kontrolMaddesi" | UrunTanim, id: number) {
+export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kdvOrani" | "vergiTanimi" | "kontrolMaddesi" | UrunTanim, id: number) {
   const k = await yetkiIste("YONETICI");
   const where = { id };
   let aktif: boolean | undefined;
@@ -238,6 +273,9 @@ export async function aktiflikDegistir(tablo: "konum" | "otvOrani" | "kdvOrani" 
   } else if (tablo === "otvOrani") {
     aktif = (await db.otvOrani.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.otvOrani.update({ where, data: { aktif: !aktif } });
+  } else if (tablo === "vergiTanimi") {
+    aktif = (await db.vergiTanimi.findUnique({ where }))?.aktif;
+    if (aktif !== undefined) await db.vergiTanimi.update({ where, data: { aktif: !aktif } });
   } else if (tablo === "kdvOrani") {
     aktif = (await db.kdvOrani.findUnique({ where }))?.aktif;
     if (aktif !== undefined) await db.kdvOrani.update({ where, data: { aktif: !aktif } });
